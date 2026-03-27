@@ -27,7 +27,14 @@ target_sources(ndtbl
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
+      include/ndtbl/types.hpp
+      include/ndtbl/axis.hpp
+      include/ndtbl/grid.hpp
+      include/ndtbl/field_group.hpp
+      include/ndtbl/any_field_group.hpp
+      include/ndtbl/io.hpp
       include/ndtbl/ndtbl.hpp
+      include/ndtbl/detail/binary_io.hpp
 )
 
 # Request a minimum C++ standard for this target

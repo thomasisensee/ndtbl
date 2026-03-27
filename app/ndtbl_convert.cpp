@@ -1,10 +1,13 @@
 #include "ndtbl/ndtbl.hpp"
 
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -17,11 +20,11 @@ struct parsed_text_table
 };
 
 std::string
-read_file(const std::string& path)
+read_file(const std::filesystem::path& path)
 {
-  std::ifstream input(path.c_str(), std::ios::binary);
+  std::ifstream input(path, std::ios::binary);
   if (!input.is_open()) {
-    throw std::runtime_error("failed to open text table: " + path);
+    throw std::runtime_error("failed to open text table: " + path.string());
   }
 
   return std::string((std::istreambuf_iterator<char>(input)),
@@ -29,7 +32,7 @@ read_file(const std::string& path)
 }
 
 std::string
-strip_comments(const std::string& input)
+strip_comments(std::string_view input)
 {
   std::string output;
   output.reserve(input.size());
@@ -83,15 +86,16 @@ strip_comments(const std::string& input)
 class token_stream
 {
 public:
-  explicit token_stream(const std::string& input)
-    : tokens_(tokenize(input))
+  explicit token_stream(std::string input)
+    : storage_(std::move(input))
+    , tokens_(tokenize(storage_))
     , index_(0)
   {
   }
 
   bool empty() const { return index_ >= tokens_.size(); }
 
-  const std::string& peek(std::size_t offset = 0) const
+  std::string_view peek(std::size_t offset = 0) const
   {
     if (index_ + offset >= tokens_.size()) {
       throw std::runtime_error("unexpected end of token stream");
@@ -99,19 +103,19 @@ public:
     return tokens_[index_ + offset];
   }
 
-  std::string next()
+  std::string_view next()
   {
-    const std::string token = peek();
+    const std::string_view token = peek();
     ++index_;
     return token;
   }
 
-  void expect(const char* expected)
+  void expect(std::string_view expected)
   {
-    const std::string token = next();
+    const std::string_view token = next();
     if (token != expected) {
       throw std::runtime_error("expected token '" + std::string(expected) +
-                               "' but found '" + token + "'");
+                               "' but found '" + std::string(token) + "'");
     }
   }
 
@@ -121,9 +125,9 @@ private:
     return c == '{' || c == '}' || c == '(' || c == ')' || c == ';';
   }
 
-  static std::vector<std::string> tokenize(const std::string& input)
+  static std::vector<std::string_view> tokenize(std::string_view input)
   {
-    std::vector<std::string> tokens;
+    std::vector<std::string_view> tokens;
     std::size_t i = 0;
     while (i < input.size()) {
       const char c = input[i];
@@ -134,7 +138,7 @@ private:
       }
 
       if (is_punctuation(c)) {
-        tokens.push_back(std::string(1, c));
+        tokens.push_back(input.substr(i, 1));
         ++i;
         continue;
       }
@@ -165,20 +169,21 @@ private:
     return tokens;
   }
 
-  std::vector<std::string> tokens_;
+  std::string storage_;
+  std::vector<std::string_view> tokens_;
   std::size_t index_;
 };
 
 std::size_t
-parse_size(const std::string& token)
+parse_size(std::string_view token)
 {
-  return static_cast<std::size_t>(std::stoull(token));
+  return static_cast<std::size_t>(std::stoull(std::string(token)));
 }
 
 double
-parse_scalar(const std::string& token)
+parse_scalar(std::string_view token)
 {
-  return std::stod(token);
+  return std::stod(std::string(token));
 }
 
 void
@@ -187,7 +192,7 @@ skip_parenthesized(token_stream& tokens)
   tokens.expect("(");
   int depth = 1;
   while (depth > 0) {
-    const std::string token = tokens.next();
+    const std::string_view token = tokens.next();
     if (token == "(") {
       ++depth;
     } else if (token == ")") {
@@ -202,7 +207,7 @@ skip_braced(token_stream& tokens)
   tokens.expect("{");
   int depth = 1;
   while (depth > 0) {
-    const std::string token = tokens.next();
+    const std::string_view token = tokens.next();
     if (token == "{") {
       ++depth;
     } else if (token == "}") {
@@ -254,27 +259,25 @@ parse_nested_values(token_stream& tokens,
 }
 
 std::string
-default_field_name(const std::string& table_name, const std::string& path)
+default_field_name(std::string_view table_name,
+                   const std::filesystem::path& path)
 {
   if (!table_name.empty()) {
-    if (table_name.size() > 6 &&
-        table_name.substr(table_name.size() - 6) == "_table") {
-      return table_name.substr(0, table_name.size() - 6);
+    if (table_name.ends_with("_table")) {
+      return std::string(table_name.substr(0, table_name.size() - 6));
     }
-    return table_name;
+    return std::string(table_name);
   }
 
-  const std::size_t slash = path.find_last_of("/\\");
-  const std::string stem =
-    slash == std::string::npos ? path : path.substr(slash + 1);
-  if (stem.size() > 6 && stem.substr(stem.size() - 6) == "_table") {
-    return stem.substr(0, stem.size() - 6);
+  const std::string filename = path.filename().string();
+  if (std::string_view(filename).ends_with("_table")) {
+    return filename.substr(0, filename.size() - 6);
   }
-  return stem;
+  return filename;
 }
 
 parsed_text_table
-parse_text_table(const std::string& path)
+parse_text_table(const std::filesystem::path& path)
 {
   token_stream tokens(strip_comments(read_file(path)));
   std::vector<double> axis_mins;
@@ -284,7 +287,7 @@ parse_text_table(const std::string& path)
   std::string table_name;
 
   while (!tokens.empty()) {
-    const std::string key = tokens.next();
+    const std::string_view key = tokens.next();
 
     if (key == "FoamFile") {
       skip_braced(tokens);
@@ -303,13 +306,14 @@ parse_text_table(const std::string& path)
       continue;
     }
 
-    table_name = key;
+    table_name = std::string(key);
     parse_nested_values(tokens, 0, extents, values);
     tokens.expect(";");
   }
 
   if (extents.empty()) {
-    throw std::runtime_error("no nd values found in text table: " + path);
+    throw std::runtime_error("no nd values found in text table: " +
+                             path.string());
   }
 
   if (axis_mins.empty()) {
@@ -338,7 +342,7 @@ parse_text_table(const std::string& path)
 }
 
 ndtbl::AnyFieldGroup
-pack_group(const std::vector<parsed_text_table>& tables, bool use_float)
+pack_group(std::span<const parsed_text_table> tables, bool use_float)
 {
   if (tables.empty()) {
     throw std::runtime_error("no input tables supplied");
@@ -424,14 +428,14 @@ main(int argc, char** argv)
       return 1;
     }
 
-    const std::string output_path = argv[arg_index++];
+    const std::filesystem::path output_path = argv[arg_index++];
     std::vector<parsed_text_table> tables;
     for (int i = arg_index; i < argc; ++i) {
       tables.push_back(parse_text_table(argv[i]));
     }
 
-    ndtbl::write_group(output_path, pack_group(tables, use_float));
-    std::cout << "Wrote " << output_path << " with " << tables.size()
+    ndtbl::write_group(output_path.string(), pack_group(tables, use_float));
+    std::cout << "Wrote " << output_path.string() << " with " << tables.size()
               << " field(s)\n";
     return 0;
   } catch (const std::exception& error) {

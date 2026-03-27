@@ -8,6 +8,11 @@ target_link_libraries(ndtbl_convert
     ndtbl
 )
 
+target_compile_features(ndtbl_convert
+  PRIVATE
+    cxx_std_20
+)
+
 set_target_properties(ndtbl_convert
   PROPERTIES
     OUTPUT_NAME "ndtbl-convert"
@@ -21,6 +26,11 @@ add_executable(ndtbl_inspect
 target_link_libraries(ndtbl_inspect
   PRIVATE
     ndtbl
+)
+
+target_compile_features(ndtbl_inspect
+  PRIVATE
+    cxx_std_20
 )
 
 set_target_properties(ndtbl_inspect

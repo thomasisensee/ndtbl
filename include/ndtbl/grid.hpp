@@ -90,9 +90,19 @@ public:
   const std::array<std::size_t, Dim>& extents() const { return extents_; }
 
   /**
+   * @brief Return the extent by dimension index.
+   */
+  std::size_t extent(std::size_t index) const { return extents_[index]; }
+
+  /**
    * @brief Return the flat-memory strides of each dimension.
    */
   const std::array<std::size_t, Dim>& strides() const { return strides_; }
+
+  /**
+   * @brief Return the flat-memory stride by dimension index.
+   */
+  std::size_t stride(std::size_t index) const { return strides_[index]; }
 
   /**
    * @brief Return the total number of support points in the grid.

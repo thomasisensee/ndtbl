@@ -28,3 +28,12 @@ repos:
     rev: v1.7.11
     hooks:
       - id: actionlint
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.8
+    hooks:
+      # Run the linter
+      - id: ruff-check
+        args: [ --fix, --show-fixes ]
+      # Run the formatter
+      - id: ruff-format

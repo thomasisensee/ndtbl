@@ -32,9 +32,22 @@ public:
   }
 
   /**
+   * @brief Return the flat storage index by corner index.
+   */
+  std::size_t point_index(std::size_t index) const
+  {
+    return point_indices_[index];
+  }
+
+  /**
    * @brief Return the interpolation weights of all interpolation corners.
    */
   const std::array<double, corners>& weights() const { return weights_; }
+
+  /**
+   * @brief Return the interpolation weights by corner index.
+   */
+  double weight(std::size_t index) const { return weights_[index]; }
 
 private:
   template<std::size_t>

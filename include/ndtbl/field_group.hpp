@@ -98,8 +98,8 @@ public:
     std::vector<Value> results(field_count(), Value(0));
     for (std::size_t corner = 0; corner < PreparedQuery<Dim>::corners;
          ++corner) {
-      const double weight = prepared.weights()[corner];
-      const std::size_t base = prepared.point_indices()[corner] * field_count();
+      const double weight = prepared.weight(corner);
+      const std::size_t base = prepared.point_index(corner) * field_count();
       for (std::size_t field = 0; field < field_count(); ++field) {
         results[field] = static_cast<Value>(
           results[field] +

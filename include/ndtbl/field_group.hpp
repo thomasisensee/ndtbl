@@ -101,9 +101,8 @@ public:
       const double weight = prepared.weight(corner);
       const std::size_t base = prepared.point_index(corner) * field_count();
       for (std::size_t field = 0; field < field_count(); ++field) {
-        results[field] = static_cast<Value>(
-          results[field] +
-          static_cast<Value>(weight * interleaved_values_[base + field]));
+        results[field] +=
+          static_cast<Value>(weight * interleaved_values_[base + field]);
       }
     }
     return results;

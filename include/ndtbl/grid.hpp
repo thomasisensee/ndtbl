@@ -55,6 +55,7 @@ public:
 
   Grid()
   {
+    point_count_ = 0;
     extents_.fill(0);
     strides_.fill(0);
   }
@@ -65,9 +66,11 @@ public:
   explicit Grid(const std::array<Axis, Dim>& axes)
     : axes_(axes)
   {
+    point_count_ = 1;
     strides_[Dim - 1] = 1;
     for (std::size_t axis = Dim; axis-- > 0;) {
       extents_[axis] = axes_[axis].size();
+      point_count_ *= extents_[axis];
       if (axis + 1 < Dim) {
         strides_[axis] = strides_[axis + 1] * extents_[axis + 1];
       }
@@ -107,14 +110,7 @@ public:
   /**
    * @brief Return the total number of support points in the grid.
    */
-  std::size_t point_count() const
-  {
-    std::size_t count = 1;
-    for (std::size_t axis = 0; axis < Dim; ++axis) {
-      count *= extents_[axis];
-    }
-    return count;
-  }
+  std::size_t point_count() const { return point_count_; }
 
   /**
    * @brief Check whether another grid uses the same axes.
@@ -172,6 +168,7 @@ public:
   }
 
 private:
+  std::size_t point_count_;
   std::array<Axis, Dim> axes_;
   std::array<std::size_t, Dim> extents_;
   std::array<std::size_t, Dim> strides_;

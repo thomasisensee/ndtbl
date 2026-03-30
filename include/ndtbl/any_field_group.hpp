@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ndtbl/field_group.hpp"
+#include "ndtbl/types.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -152,30 +153,33 @@ private:
     {
     }
 
-    constexpr std::size_t dimension() const noexcept { return Dim; }
+    constexpr std::size_t dimension() const noexcept override { return Dim; }
 
-    std::size_t field_count() const { return group_.field_count(); }
+    std::size_t field_count() const override { return group_.field_count(); }
 
-    scalar_type value_type() const { return scalar_type_of<Value>(); }
+    constexpr scalar_type value_type() const noexcept override
+    {
+      return scalar_type_of<Value>();
+    }
 
-    std::vector<std::string> field_names() const
+    std::vector<std::string> field_names() const override
     {
       return group_.field_names();
     }
 
-    std::vector<Axis> axes() const
+    std::vector<Axis> axes() const override
     {
       const std::array<Axis, Dim>& group_axes = group_.grid().axes();
       return std::vector<Axis>(group_axes.begin(), group_axes.end());
     }
 
-    std::size_t field_index(const std::string& field_name) const
+    std::size_t field_index(const std::string& field_name) const override
     {
       return group_.field_index(field_name);
     }
 
     std::vector<double> evaluate_all(
-      const std::vector<double>& coordinates) const
+      const std::vector<double>& coordinates) const override
     {
       if (coordinates.size() != Dim) {
         throw std::invalid_argument(
@@ -188,7 +192,10 @@ private:
       return std::vector<double>(values.begin(), values.end());
     }
 
-    void write(std::ostream& os) const { write_group_stream(os, group_); }
+    void write(std::ostream& os) const override
+    {
+      write_group_stream(os, group_);
+    }
 
     FieldGroup<Value, Dim> group_;
   };

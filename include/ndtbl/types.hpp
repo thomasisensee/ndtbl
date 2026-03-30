@@ -29,8 +29,8 @@ enum class scalar_type : std::uint8_t
  * Only `float` and `double` are supported in the current implementation.
  */
 template<class Value>
-inline scalar_type
-scalar_type_of()
+constexpr scalar_type
+scalar_type_of() noexcept
 {
   static_assert(std::is_same<Value, float>::value ||
                   std::is_same<Value, double>::value,

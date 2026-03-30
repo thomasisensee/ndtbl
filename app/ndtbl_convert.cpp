@@ -19,6 +19,13 @@ struct parsed_text_table
   std::vector<double> values;
 };
 
+template<class Value>
+struct packed_group
+{
+  ndtbl::GroupMetadata metadata;
+  std::vector<Value> interleaved_values;
+};
+
 std::string
 read_file(const std::filesystem::path& path)
 {
@@ -341,8 +348,9 @@ parse_text_table(const std::filesystem::path& path)
   return parsed;
 }
 
-ndtbl::AnyFieldGroup
-pack_group(std::span<const parsed_text_table> tables, bool use_float)
+template<class Value>
+packed_group<Value>
+pack_group(std::span<const parsed_text_table> tables)
 {
   if (tables.empty()) {
     throw std::runtime_error("no input tables supplied");
@@ -372,27 +380,23 @@ pack_group(std::span<const parsed_text_table> tables, bool use_float)
     field_names.push_back(tables[i].field_name);
   }
 
-  if (use_float) {
-    std::vector<float> interleaved;
-    interleaved.reserve(point_count * tables.size());
-    for (std::size_t point = 0; point < point_count; ++point) {
-      for (std::size_t field = 0; field < tables.size(); ++field) {
-        interleaved.push_back(static_cast<float>(tables[field].values[point]));
-      }
-    }
-    return ndtbl::detail::make_any_group<float>(
-      reference_axes, field_names, interleaved);
-  }
-
-  std::vector<double> interleaved;
+  std::vector<Value> interleaved;
   interleaved.reserve(point_count * tables.size());
   for (std::size_t point = 0; point < point_count; ++point) {
     for (std::size_t field = 0; field < tables.size(); ++field) {
-      interleaved.push_back(tables[field].values[point]);
+      interleaved.push_back(static_cast<Value>(tables[field].values[point]));
     }
   }
-  return ndtbl::detail::make_any_group<double>(
-    reference_axes, field_names, interleaved);
+
+  packed_group<Value> packed;
+  packed.metadata.value_type = ndtbl::scalar_type_of<Value>();
+  packed.metadata.dimension = reference_axes.size();
+  packed.metadata.field_count = tables.size();
+  packed.metadata.point_count = point_count;
+  packed.metadata.axes = reference_axes;
+  packed.metadata.field_names = field_names;
+  packed.interleaved_values = interleaved;
+  return packed;
 }
 
 void
@@ -434,7 +438,15 @@ main(int argc, char** argv)
       tables.push_back(parse_text_table(argv[i]));
     }
 
-    ndtbl::write_group(output_path.string(), pack_group(tables, use_float));
+    if (use_float) {
+      const packed_group<float> packed = pack_group<float>(tables);
+      ndtbl::write_group(
+        output_path.string(), packed.metadata, packed.interleaved_values);
+    } else {
+      const packed_group<double> packed = pack_group<double>(tables);
+      ndtbl::write_group(
+        output_path.string(), packed.metadata, packed.interleaved_values);
+    }
     std::cout << "Wrote " << output_path.string() << " with " << tables.size()
               << " field(s)\n";
     return 0;

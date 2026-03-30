@@ -39,21 +39,21 @@ main(int argc, char** argv)
     }
 
     const std::filesystem::path input_path = argv[1];
-    const ndtbl::AnyFieldGroup group = ndtbl::read_group(input_path.string());
-    const std::vector<ndtbl::Axis> axes = group.axes();
-    const std::vector<std::string> names = group.field_names();
+    const ndtbl::GroupMetadata metadata =
+      ndtbl::read_group_metadata(input_path.string());
 
     std::cout << "file: " << input_path.string() << '\n';
-    std::cout << "dimension: " << group.dimension() << '\n';
-    std::cout << "fields: " << group.field_count() << '\n';
-    std::cout << "value_type: " << value_type_name(group.value_type()) << '\n';
+    std::cout << "dimension: " << metadata.dimension << '\n';
+    std::cout << "fields: " << metadata.field_count << '\n';
+    std::cout << "value_type: " << value_type_name(metadata.value_type) << '\n';
 
-    for (std::size_t axis = 0; axis < axes.size(); ++axis) {
-      print_axis(axis, axes[axis]);
+    for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
+      print_axis(axis, metadata.axes[axis]);
     }
 
-    for (std::size_t field = 0; field < names.size(); ++field) {
-      std::cout << "field[" << field << "]: " << names[field] << '\n';
+    for (std::size_t field = 0; field < metadata.field_names.size(); ++field) {
+      std::cout << "field[" << field << "]: " << metadata.field_names[field]
+                << '\n';
     }
 
     return 0;

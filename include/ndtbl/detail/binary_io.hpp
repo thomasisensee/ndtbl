@@ -1,6 +1,7 @@
 #pragma once
 
-#include "ndtbl/any_field_group.hpp"
+#include "ndtbl/field_group.hpp"
+#include "ndtbl/metadata.hpp"
 
 #include <algorithm>
 #include <array>
@@ -67,10 +68,28 @@ read_string(std::istream& is)
   return value;
 }
 
-template<class Value, std::size_t Dim>
+template<class Value>
 inline void
-write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
+write_group_stream_impl(std::ostream& os,
+                        const GroupMetadata& metadata,
+                        const std::vector<Value>& payload)
 {
+  if (metadata.axes.size() != metadata.dimension) {
+    throw std::invalid_argument(
+      "ndtbl metadata axis count does not match dimension");
+  }
+
+  if (metadata.field_names.size() != metadata.field_count) {
+    throw std::invalid_argument(
+      "ndtbl metadata field count does not match field names");
+  }
+
+  const std::size_t expected_values =
+    metadata.point_count * metadata.field_count;
+  if (payload.size() != expected_values) {
+    throw std::invalid_argument("ndtbl payload size does not match metadata");
+  }
+
   os.write(file_magic, sizeof(file_magic));
   if (!os.good()) {
     throw std::runtime_error("failed to write ndtbl header");
@@ -78,15 +97,16 @@ write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
 
   write_pod(os, endian_marker);
   write_pod<std::uint8_t>(os, 1u);
-  write_pod<std::uint8_t>(os,
-                          static_cast<std::uint8_t>(scalar_type_of<Value>()));
+  write_pod<std::uint8_t>(os, static_cast<std::uint8_t>(metadata.value_type));
   write_pod<std::uint16_t>(os, 0u);
-  write_pod<std::uint64_t>(os, static_cast<std::uint64_t>(Dim));
-  write_pod<std::uint64_t>(os, static_cast<std::uint64_t>(group.field_count()));
-  write_pod<std::uint64_t>(os, static_cast<std::uint64_t>(group.point_count()));
+  write_pod<std::uint64_t>(os, static_cast<std::uint64_t>(metadata.dimension));
+  write_pod<std::uint64_t>(os,
+                           static_cast<std::uint64_t>(metadata.field_count));
+  write_pod<std::uint64_t>(os,
+                           static_cast<std::uint64_t>(metadata.point_count));
 
-  for (std::size_t axis = 0; axis < Dim; ++axis) {
-    const Axis& axis_spec = group.grid().axis(axis);
+  for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
+    const Axis& axis_spec = metadata.axes[axis];
     write_pod<std::uint8_t>(os, static_cast<std::uint8_t>(axis_spec.kind()));
     write_pod<std::uint8_t>(os, 0u);
     write_pod<std::uint16_t>(os, 0u);
@@ -102,17 +122,29 @@ write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
     }
   }
 
-  const std::vector<std::string>& names = group.field_names();
-  for (std::size_t field = 0; field < names.size(); ++field) {
-    write_string(os, names[field]);
+  for (std::size_t field = 0; field < metadata.field_names.size(); ++field) {
+    write_string(os, metadata.field_names[field]);
   }
 
-  const std::vector<Value>& payload = group.interleaved_values();
   os.write(reinterpret_cast<const char*>(payload.data()),
            static_cast<std::streamsize>(payload.size() * sizeof(Value)));
   if (!os.good()) {
     throw std::runtime_error("failed to write ndtbl field payload");
   }
+}
+
+template<class Value, std::size_t Dim>
+inline void
+write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
+{
+  GroupMetadata metadata = { scalar_type_of<Value>(),
+                             Dim,
+                             group.field_count(),
+                             group.point_count(),
+                             std::vector<Axis>(group.grid().axes().begin(),
+                                               group.grid().axes().end()),
+                             group.field_names() };
+  write_group_stream_impl(os, metadata, group.interleaved_values());
 }
 
 inline void
@@ -124,6 +156,67 @@ verify_magic(std::istream& is)
       !std::equal(magic, magic + sizeof(file_magic), file_magic)) {
     throw std::runtime_error("invalid ndtbl magic header");
   }
+}
+
+inline GroupMetadata
+read_group_metadata_impl(std::istream& is)
+{
+  verify_magic(is);
+  const std::uint32_t marker = read_pod<std::uint32_t>(is);
+  if (marker != endian_marker) {
+    throw std::runtime_error("unsupported ndtbl endianness");
+  }
+
+  const std::uint8_t version = read_pod<std::uint8_t>(is);
+  if (version != 1u) {
+    throw std::runtime_error("unsupported ndtbl version");
+  }
+
+  GroupMetadata metadata;
+  metadata.value_type = static_cast<scalar_type>(read_pod<std::uint8_t>(is));
+  read_pod<std::uint16_t>(is);
+
+  metadata.dimension = static_cast<std::size_t>(read_pod<std::uint64_t>(is));
+  metadata.field_count = static_cast<std::size_t>(read_pod<std::uint64_t>(is));
+  metadata.point_count = static_cast<std::size_t>(read_pod<std::uint64_t>(is));
+
+  metadata.axes.reserve(metadata.dimension);
+  for (std::size_t axis = 0; axis < metadata.dimension; ++axis) {
+    const axis_kind kind = static_cast<axis_kind>(read_pod<std::uint8_t>(is));
+    read_pod<std::uint8_t>(is);
+    read_pod<std::uint16_t>(is);
+    const std::size_t extent =
+      static_cast<std::size_t>(read_pod<std::uint64_t>(is));
+
+    if (kind == axis_kind::uniform) {
+      const double min_value = read_pod<double>(is);
+      const double max_value = read_pod<double>(is);
+      metadata.axes.push_back(Axis::uniform(min_value, max_value, extent));
+    } else if (kind == axis_kind::explicit_coordinates) {
+      std::vector<double> coordinates(extent);
+      for (std::size_t i = 0; i < extent; ++i) {
+        coordinates[i] = read_pod<double>(is);
+      }
+      metadata.axes.push_back(Axis::from_coordinates(coordinates));
+    } else {
+      throw std::runtime_error("unsupported ndtbl axis kind");
+    }
+  }
+
+  metadata.field_names.reserve(metadata.field_count);
+  for (std::size_t field = 0; field < metadata.field_count; ++field) {
+    metadata.field_names.push_back(read_string(is));
+  }
+
+  std::size_t expected_point_count = 1;
+  for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
+    expected_point_count *= metadata.axes[axis].size();
+  }
+  if (expected_point_count != metadata.point_count) {
+    throw std::runtime_error("ndtbl point count does not match axis extents");
+  }
+
+  return metadata;
 }
 
 template<class Value>
@@ -139,61 +232,18 @@ read_payload(std::istream& is, std::size_t value_count)
   return values;
 }
 
-template<class Value>
-inline AnyFieldGroup
-make_any_group(const std::vector<Axis>& axes,
-               const std::vector<std::string>& field_names,
-               const std::vector<Value>& interleaved_values)
+template<std::size_t Dim>
+inline std::array<Axis, Dim>
+fixed_axes(const std::vector<Axis>& axes)
 {
-  switch (axes.size()) {
-    case 1: {
-      std::array<Axis, 1> fixed_axes = { axes[0] };
-      return AnyFieldGroup(FieldGroup<Value, 1>(
-        Grid<1>(fixed_axes), field_names, interleaved_values));
-    }
-    case 2: {
-      std::array<Axis, 2> fixed_axes = { axes[0], axes[1] };
-      return AnyFieldGroup(FieldGroup<Value, 2>(
-        Grid<2>(fixed_axes), field_names, interleaved_values));
-    }
-    case 3: {
-      std::array<Axis, 3> fixed_axes = { axes[0], axes[1], axes[2] };
-      return AnyFieldGroup(FieldGroup<Value, 3>(
-        Grid<3>(fixed_axes), field_names, interleaved_values));
-    }
-    case 4: {
-      std::array<Axis, 4> fixed_axes = { axes[0], axes[1], axes[2], axes[3] };
-      return AnyFieldGroup(FieldGroup<Value, 4>(
-        Grid<4>(fixed_axes), field_names, interleaved_values));
-    }
-    case 5: {
-      std::array<Axis, 5> fixed_axes = {
-        axes[0], axes[1], axes[2], axes[3], axes[4]
-      };
-      return AnyFieldGroup(FieldGroup<Value, 5>(
-        Grid<5>(fixed_axes), field_names, interleaved_values));
-    }
-    case 6: {
-      std::array<Axis, 6> fixed_axes = { axes[0], axes[1], axes[2],
-                                         axes[3], axes[4], axes[5] };
-      return AnyFieldGroup(FieldGroup<Value, 6>(
-        Grid<6>(fixed_axes), field_names, interleaved_values));
-    }
-    case 7: {
-      std::array<Axis, 7> fixed_axes = { axes[0], axes[1], axes[2], axes[3],
-                                         axes[4], axes[5], axes[6] };
-      return AnyFieldGroup(FieldGroup<Value, 7>(
-        Grid<7>(fixed_axes), field_names, interleaved_values));
-    }
-    case 8: {
-      std::array<Axis, 8> fixed_axes = { axes[0], axes[1], axes[2], axes[3],
-                                         axes[4], axes[5], axes[6], axes[7] };
-      return AnyFieldGroup(FieldGroup<Value, 8>(
-        Grid<8>(fixed_axes), field_names, interleaved_values));
-    }
-    default:
-      throw std::invalid_argument("ndtbl supports dimensions 1 through 8");
+  if (axes.size() != Dim) {
+    throw std::invalid_argument(
+      "ndtbl axis count does not match typed dimension");
   }
+
+  std::array<Axis, Dim> fixed = {};
+  std::copy(axes.begin(), axes.end(), fixed.begin());
+  return fixed;
 }
 
 } // namespace detail

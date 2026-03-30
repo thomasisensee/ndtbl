@@ -96,6 +96,18 @@ public:
   std::vector<Value> evaluate_all(const PreparedQuery<Dim>& prepared) const
   {
     std::vector<Value> results(field_count(), Value(0));
+    evaluate_all_into(prepared, results.data());
+    return results;
+  }
+
+  /**
+   * @brief Evaluate all fields using a previously prepared interpolation
+   * stencil into caller-provided storage.
+   */
+  void evaluate_all_into(const PreparedQuery<Dim>& prepared,
+                         Value* results) const
+  {
+    std::fill(results, results + field_count(), Value(0));
     for (std::size_t corner = 0; corner < PreparedQuery<Dim>::corners;
          ++corner) {
       const double weight = prepared.weight(corner);
@@ -105,7 +117,6 @@ public:
           static_cast<Value>(weight * interleaved_values_[base + field]);
       }
     }
-    return results;
   }
 
   /**
@@ -115,6 +126,16 @@ public:
     const std::array<double, Dim>& coordinates) const
   {
     return evaluate_all(grid_.prepare(coordinates));
+  }
+
+  /**
+   * @brief Evaluate all fields directly from query coordinates into
+   * caller-provided storage.
+   */
+  void evaluate_all_into(const std::array<double, Dim>& coordinates,
+                         Value* results) const
+  {
+    evaluate_all_into(grid_.prepare(coordinates), results);
   }
 
 private:

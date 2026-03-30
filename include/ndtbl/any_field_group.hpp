@@ -1,9 +1,10 @@
 #pragma once
 
 #include "ndtbl/field_group.hpp"
+#include "ndtbl/metadata.hpp"
 #include "ndtbl/types.hpp"
 
-#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <iosfwd>
 #include <memory>
@@ -20,42 +21,23 @@ write_group_stream(std::ostream& os, const FieldGroup<Value, Dim>& group);
 /**
  * @brief Runtime-erased wrapper around a typed `FieldGroup<Value, Dim>`.
  *
- * This wrapper is primarily used by binary loading and adapter code that only
- * learns the field-group dimensionality and precision at runtime.
+ * The dimensionality remains part of the type. Only the stored scalar payload
+ * type is selected from file metadata at runtime.
  */
-class AnyFieldGroup
+template<std::size_t Dim>
+class LoadedFieldGroup
 {
 public:
-  AnyFieldGroup() {}
+  LoadedFieldGroup() {}
 
-  /**
-   * @brief Store a typed field group in a runtime-erased wrapper.
-   */
-  template<class Value, std::size_t Dim>
-  explicit AnyFieldGroup(const FieldGroup<Value, Dim>& group)
-    : impl_(std::make_shared<Model<Value, Dim>>(group))
+  template<class Value>
+  explicit LoadedFieldGroup(const FieldGroup<Value, Dim>& group)
+    : impl_(std::make_shared<Model<Value>>(group))
   {
   }
 
-  /**
-   * @brief Return whether this wrapper currently stores a field group.
-   */
   bool empty() const { return !impl_; }
 
-  /**
-   * @brief Return the dimensionality of the stored field group.
-   */
-  std::size_t dimension() const
-  {
-    if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
-    }
-    return impl_->dimension();
-  }
-
-  /**
-   * @brief Return the number of stored fields.
-   */
   std::size_t field_count() const
   {
     if (!impl_) {
@@ -64,9 +46,6 @@ public:
     return impl_->field_count();
   }
 
-  /**
-   * @brief Return the scalar storage type of the wrapped field group.
-   */
   scalar_type value_type() const
   {
     if (!impl_) {
@@ -75,9 +54,6 @@ public:
     return impl_->value_type();
   }
 
-  /**
-   * @brief Return the field names in storage order.
-   */
   std::vector<std::string> field_names() const
   {
     if (!impl_) {
@@ -86,10 +62,7 @@ public:
     return impl_->field_names();
   }
 
-  /**
-   * @brief Return the axis descriptors of the stored grid.
-   */
-  std::vector<Axis> axes() const
+  std::array<Axis, Dim> axes() const
   {
     if (!impl_) {
       throw std::runtime_error("ndtbl field group is empty");
@@ -97,9 +70,6 @@ public:
     return impl_->axes();
   }
 
-  /**
-   * @brief Resolve a field name to its field index.
-   */
   std::size_t field_index(const std::string& field_name) const
   {
     if (!impl_) {
@@ -108,20 +78,23 @@ public:
     return impl_->field_index(field_name);
   }
 
-  /**
-   * @brief Evaluate all fields at one runtime-sized query point.
-   */
-  std::vector<double> evaluate_all(const std::vector<double>& coordinates) const
+  std::vector<double> evaluate_all(
+    const std::array<double, Dim>& coordinates) const
+  {
+    std::vector<double> values(field_count(), 0.0);
+    evaluate_all_into(coordinates, values.data());
+    return values;
+  }
+
+  void evaluate_all_into(const std::array<double, Dim>& coordinates,
+                         double* values) const
   {
     if (!impl_) {
       throw std::runtime_error("ndtbl field group is empty");
     }
-    return impl_->evaluate_all(coordinates);
+    impl_->evaluate_all_into(coordinates, values);
   }
 
-  /**
-   * @brief Serialize the wrapped field group to an ndtbl binary stream.
-   */
   void write(std::ostream& os) const
   {
     if (!impl_) {
@@ -134,62 +107,48 @@ private:
   struct Concept
   {
     virtual ~Concept() {}
-    virtual std::size_t dimension() const = 0;
     virtual std::size_t field_count() const = 0;
     virtual scalar_type value_type() const = 0;
     virtual std::vector<std::string> field_names() const = 0;
-    virtual std::vector<Axis> axes() const = 0;
+    virtual std::array<Axis, Dim> axes() const = 0;
     virtual std::size_t field_index(const std::string& field_name) const = 0;
-    virtual std::vector<double> evaluate_all(
-      const std::vector<double>& coordinates) const = 0;
+    virtual void evaluate_all_into(const std::array<double, Dim>& coordinates,
+                                   double* values) const = 0;
     virtual void write(std::ostream& os) const = 0;
   };
 
-  template<class Value, std::size_t Dim>
+  template<class Value>
   struct Model : Concept
   {
     explicit Model(const FieldGroup<Value, Dim>& group)
       : group_(group)
+      , scratch_(group.field_count(), Value(0))
     {
     }
-
-    constexpr std::size_t dimension() const noexcept override { return Dim; }
 
     std::size_t field_count() const override { return group_.field_count(); }
 
-    constexpr scalar_type value_type() const noexcept override
-    {
-      return scalar_type_of<Value>();
-    }
+    scalar_type value_type() const override { return scalar_type_of<Value>(); }
 
     std::vector<std::string> field_names() const override
     {
       return group_.field_names();
     }
 
-    std::vector<Axis> axes() const override
-    {
-      const std::array<Axis, Dim>& group_axes = group_.grid().axes();
-      return std::vector<Axis>(group_axes.begin(), group_axes.end());
-    }
+    std::array<Axis, Dim> axes() const override { return group_.grid().axes(); }
 
     std::size_t field_index(const std::string& field_name) const override
     {
       return group_.field_index(field_name);
     }
 
-    std::vector<double> evaluate_all(
-      const std::vector<double>& coordinates) const override
+    void evaluate_all_into(const std::array<double, Dim>& coordinates,
+                           double* values) const override
     {
-      if (coordinates.size() != Dim) {
-        throw std::invalid_argument(
-          "query dimensionality does not match ndtbl field group");
+      group_.evaluate_all_into(coordinates, scratch_.data());
+      for (std::size_t field = 0; field < scratch_.size(); ++field) {
+        values[field] = static_cast<double>(scratch_[field]);
       }
-
-      std::array<double, Dim> query;
-      std::copy(coordinates.begin(), coordinates.end(), query.begin());
-      const std::vector<Value> values = group_.evaluate_all(query);
-      return std::vector<double>(values.begin(), values.end());
     }
 
     void write(std::ostream& os) const override
@@ -198,9 +157,13 @@ private:
     }
 
     FieldGroup<Value, Dim> group_;
+    mutable std::vector<Value> scratch_;
   };
 
   std::shared_ptr<const Concept> impl_;
 };
+
+template<std::size_t Dim>
+using AnyFieldGroup = LoadedFieldGroup<Dim>;
 
 } // namespace ndtbl

@@ -5,4 +5,5 @@
 #include "ndtbl/field_group.hpp"
 #include "ndtbl/grid.hpp"
 #include "ndtbl/io.hpp"
+#include "ndtbl/metadata.hpp"
 #include "ndtbl/types.hpp"

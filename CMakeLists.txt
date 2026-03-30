@@ -32,6 +32,7 @@ target_sources(ndtbl
       include/ndtbl/grid.hpp
       include/ndtbl/field_group.hpp
       include/ndtbl/any_field_group.hpp
+      include/ndtbl/metadata.hpp
       include/ndtbl/io.hpp
       include/ndtbl/ndtbl.hpp
       include/ndtbl/detail/binary_io.hpp

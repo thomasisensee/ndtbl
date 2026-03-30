@@ -152,7 +152,7 @@ private:
     {
     }
 
-    std::size_t dimension() const { return Dim; }
+    constexpr std::size_t dimension() const noexcept { return Dim; }
 
     std::size_t field_count() const { return group_.field_count(); }
 

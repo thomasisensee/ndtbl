@@ -1,0 +1,83 @@
+import numpy as np
+import pytest
+
+from ndtbl import FieldGroup, UniformAxis
+from ndtbl.generate import LinearFieldSpec, generate_group
+
+
+def test_generate_group_builds_expected_shape_and_names() -> None:
+    group = generate_group(
+        axes=(UniformAxis(0.0, 1.0, 3), UniformAxis(10.0, 20.0, 2)),
+        field_specs=(LinearFieldSpec("A", 0, 2.0, 1.0),),
+    )
+
+    assert isinstance(group, FieldGroup)
+    assert group.field_names == ("A",)
+    assert group.values.shape == (3, 2, 1)
+    assert group.dtype == np.dtype(np.float64)
+
+
+def test_generate_group_computes_linear_field() -> None:
+    group = generate_group(
+        axes=(UniformAxis(0.0, 1.0, 3), UniformAxis(10.0, 20.0, 2)),
+        field_specs=(LinearFieldSpec("A", 0, 2.0, 1.0),),
+    )
+
+    expected = np.array(
+        [
+            [[1.0], [1.0]],
+            [[2.0], [2.0]],
+            [[3.0], [3.0]],
+        ]
+    )
+    np.testing.assert_allclose(group.values, expected)
+
+
+def test_generate_group_broadcasts_multiple_fields_across_axes() -> None:
+    group = generate_group(
+        axes=(UniformAxis(0.0, 1.0, 3), UniformAxis(10.0, 20.0, 2)),
+        field_specs=(
+            LinearFieldSpec("A", 0, 2.0, 1.0),
+            LinearFieldSpec("B", 1, -1.0, 5.0),
+        ),
+        dtype=np.float32,
+    )
+
+    expected_a = np.array(
+        [
+            [1.0, 1.0],
+            [2.0, 2.0],
+            [3.0, 3.0],
+        ],
+        dtype=np.float32,
+    )
+    expected_b = np.array(
+        [
+            [-5.0, -15.0],
+            [-5.0, -15.0],
+            [-5.0, -15.0],
+        ],
+        dtype=np.float32,
+    )
+
+    np.testing.assert_allclose(group.values[..., 0], expected_a)
+    np.testing.assert_allclose(group.values[..., 1], expected_b)
+    assert group.dtype == np.dtype(np.float32)
+
+
+def test_generate_group_rejects_out_of_range_axis_reference() -> None:
+    with pytest.raises(ValueError, match="input axis 2 is out of range"):
+        generate_group(
+            axes=(UniformAxis(0.0, 1.0, 3),),
+            field_specs=(LinearFieldSpec("A", 2, 1.0, 0.0),),
+        )
+
+
+def test_generate_group_rejects_empty_axes_or_fields() -> None:
+    with pytest.raises(ValueError, match="at least one axis"):
+        generate_group(
+            axes=(), field_specs=(LinearFieldSpec("A", 0, 1.0, 0.0),)
+        )
+
+    with pytest.raises(ValueError, match="at least one field"):
+        generate_group(axes=(UniformAxis(0.0, 1.0, 2),), field_specs=())

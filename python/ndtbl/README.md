@@ -1,32 +1,57 @@
-# Welcome to ndtbl
+# ndtbl Python
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Documentation Status](https://readthedocs.org/projects/None/badge/)](https://None.readthedocs.io/)
-[![codecov](https://codecov.io/none/None/None/branch/main/graph/badge.svg)](https://codecov.io/none/None/None)
+Pure-Python tools for reading, writing, inspecting, and generating `.ndtbl`
+files without depending on the C++ binaries.
+
+## Features
+
+- Read `.ndtbl` metadata or full payloads
+- Write `.ndtbl` files compatible with the current C++ implementation
+- Inspect files from the command line
+- Generate small predefined linear tables for development workflows
 
 ## Installation
 
-The Python package `ndtbl` can be installed from PyPI:
-
-```
-python -m pip install ndtbl
+```bash
+python -m pip install .
 ```
 
-## Development installation
+For development:
 
-If you want to contribute to the development of `ndtbl`, we recommend
-the following editable installation from this repository:
-
-```
+```bash
 python -m pip install --editable .[tests]
 ```
 
-Having done so, the test suite can be run using `pytest`:
+## Python API
 
+```python
+import numpy as np
+
+from ndtbl import FieldGroup, UniformAxis, write_group
+
+group = FieldGroup(
+    axes=(UniformAxis(0.0, 1.0, 3), UniformAxis(10.0, 20.0, 2)),
+    field_names=("A", "B"),
+    values=np.zeros((3, 2, 2), dtype=np.float64),
+)
+
+write_group("example.ndtbl", group)
 ```
-python -m pytest
+
+## CLI
+
+Inspect an existing file:
+
+```bash
+ndtbl inspect example.ndtbl
 ```
 
-## Acknowledgments
+Generate a small linear table:
 
-This repository was set up using the [SSC Cookiecutter for Python Packages](https://github.com/ssciwr/cookiecutter-python-package).
+```bash
+ndtbl generate output.ndtbl \
+  --axis 0 1 3 \
+  --axis 10 20 2 \
+  --field-linear A 0 2.0 1.0 \
+  --field-linear B 1 -1.0 5.0
+```

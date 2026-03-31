@@ -1,13 +1,27 @@
 from importlib import metadata
 
-__version__ = metadata.version(__package__)
-del metadata
+from .io import read_group, read_metadata, write_group
+from .model import (
+    ExplicitAxis,
+    FieldGroup,
+    GroupMetadata,
+    NdtblFormatError,
+    UniformAxis,
+)
 
+try:
+    __version__ = metadata.version("ndtbl")
+except metadata.PackageNotFoundError:
+    __version__ = "0.0.0"
 
-def add_one(x: int):
-    """An example function that increases a number
-
-    :param x: The input parameter to increase
-    :return: The successor of the given number
-    """
-    return x + 1
+__all__ = [
+    "ExplicitAxis",
+    "FieldGroup",
+    "GroupMetadata",
+    "NdtblFormatError",
+    "UniformAxis",
+    "__version__",
+    "read_group",
+    "read_metadata",
+    "write_group",
+]

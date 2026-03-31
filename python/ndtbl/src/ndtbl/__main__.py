@@ -1,10 +1,4 @@
-import click
-
-
-@click.command()
-def main():
-    click.echo("This is ndtbl's command line interface.")
-
+from .cli import main
 
 if __name__ == "__main__":
     main()

@@ -5,25 +5,22 @@
 
 #include <array>
 #include <cstdio>
-#include <cstdlib>
 #include <stdexcept>
 #include <string>
-#include <unistd.h>
 
 namespace {
 
 std::string
 temporary_path()
 {
-  char path_template[] = "/tmp/ndtbl-test-XXXXXX";
-  const int fd = mkstemp(path_template);
-  if (fd == -1) {
-    throw std::runtime_error("failed to create temporary file for ndtbl test");
+  char path_buffer[L_tmpnam];
+  if (std::tmpnam(path_buffer) == nullptr) {
+    throw std::runtime_error("failed to create temporary path for ndtbl test");
   }
 
-  close(fd);
-  std::remove(path_template);
-  return std::string(path_template) + ".ndtbl";
+  const std::string path = std::string(path_buffer) + ".ndtbl";
+  std::remove(path.c_str());
+  return path;
 }
 
 } // namespace

@@ -4,6 +4,26 @@ import numpy as np
 
 from .model import FieldGroup, UniformAxis, normalize_dtype
 
+FILE_MAGIC_SIZE = 8
+ENDIAN_MARKER_SIZE = 4
+VERSION_AND_TYPE_SIZE = 4
+DIMENSION_HEADER_SIZE = 8 * 3
+AXIS_HEADER_SIZE = 8 + 8
+UNIFORM_AXIS_PAYLOAD_SIZE = 16
+STRING_LENGTH_SIZE = 8
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationSizeEstimate:
+    point_count: int
+    field_count: int
+    payload_bytes: int
+    estimated_file_bytes: int
+
+    @property
+    def estimated_file_mib(self) -> float:
+        return self.estimated_file_bytes / (1024 * 1024)
+
 
 @dataclass(frozen=True, slots=True)
 class LinearFieldSpec:
@@ -67,3 +87,44 @@ def generate_group(
 
     field_names = tuple(spec.name for spec in field_specs)
     return FieldGroup(axes=axes, field_names=field_names, values=values)
+
+
+def estimate_generated_group_size(
+    axes: tuple[UniformAxis, ...],
+    field_specs: tuple[LinearFieldSpec, ...],
+    dtype: np.dtype[np.float32] | np.dtype[np.float64] | str = np.float64,
+) -> GenerationSizeEstimate:
+    if not axes:
+        raise ValueError("at least one axis is required for generation")
+    if not field_specs:
+        raise ValueError("at least one field is required for generation")
+
+    normalized_dtype = normalize_dtype(dtype)
+    point_count = 1
+    for axis in axes:
+        point_count *= axis.size
+
+    field_count = len(field_specs)
+    payload_bytes = point_count * field_count * normalized_dtype.itemsize
+
+    metadata_bytes = (
+        FILE_MAGIC_SIZE
+        + ENDIAN_MARKER_SIZE
+        + VERSION_AND_TYPE_SIZE
+        + DIMENSION_HEADER_SIZE
+    )
+    axis_bytes = len(axes) * (AXIS_HEADER_SIZE + UNIFORM_AXIS_PAYLOAD_SIZE)
+    field_name_bytes = sum(
+        STRING_LENGTH_SIZE + len(spec.name.encode("utf-8"))
+        for spec in field_specs
+    )
+
+    return GenerationSizeEstimate(
+        point_count=point_count,
+        field_count=field_count,
+        payload_bytes=payload_bytes,
+        estimated_file_bytes=metadata_bytes
+        + axis_bytes
+        + field_name_bytes
+        + payload_bytes,
+    )

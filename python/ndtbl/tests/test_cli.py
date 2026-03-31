@@ -50,6 +50,7 @@ def test_generate_help_mentions_field_syntax(runner) -> None:
     assert result.exit_code == 0
     assert "Usage: main generate [OPTIONS] [OUTPUT]" in result.output
     assert "--field-linear NAME OFFSET C0 [C1 ...]" in result.output
+    assert "--max-size-mib" in result.output
 
 
 def test_generate_writes_expected_file_with_long_options(
@@ -256,3 +257,123 @@ def test_generate_reports_non_numeric_coefficients(runner, tmp_path) -> None:
 
     assert result.exit_code != 0
     assert "Error:" in result.output
+
+
+def test_generate_enforces_default_size_limit(runner, tmp_path) -> None:
+    path = tmp_path / "too-large.ndtbl"
+
+    result = runner.invoke(
+        main,
+        [
+            "generate",
+            "--axis",
+            "0",
+            "1",
+            "2048",
+            "--axis",
+            "0",
+            "1",
+            "2048",
+            "--field-linear",
+            "A",
+            "0.0",
+            "1.0",
+            "1.0",
+            "--field-linear",
+            "B",
+            "0.0",
+            "1.0",
+            "0.0",
+            "--field-linear",
+            "C",
+            "0.0",
+            "0.0",
+            "1.0",
+            "--field-linear",
+            "D",
+            "1.0",
+            "1.0",
+            "-1.0",
+            "--dtype",
+            "float64",
+            str(path),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "generated table exceeds the configured size limit" in result.output
+    assert "Use --max-size-mib to raise the limit explicitly." in result.output
+
+
+def test_generate_allows_explicitly_raised_size_limit(
+    runner, tmp_path
+) -> None:
+    path = tmp_path / "allowed-large.ndtbl"
+
+    result = runner.invoke(
+        main,
+        [
+            "generate",
+            "--axis",
+            "0",
+            "1",
+            "2048",
+            "--axis",
+            "0",
+            "1",
+            "2048",
+            "--field-linear",
+            "A",
+            "0.0",
+            "1.0",
+            "1.0",
+            "--field-linear",
+            "B",
+            "0.0",
+            "1.0",
+            "0.0",
+            "--field-linear",
+            "C",
+            "0.0",
+            "0.0",
+            "1.0",
+            "--field-linear",
+            "D",
+            "1.0",
+            "1.0",
+            "-1.0",
+            "--dtype",
+            "float64",
+            "--max-size-mib",
+            "256",
+            str(path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert f"wrote {path}" in result.output
+
+
+def test_generate_rejects_invalid_max_size_mib(runner, tmp_path) -> None:
+    path = tmp_path / "invalid-limit.ndtbl"
+
+    result = runner.invoke(
+        main,
+        [
+            "generate",
+            "--axis",
+            "0",
+            "1",
+            "2",
+            "--field-linear",
+            "A",
+            "0.0",
+            "1.0",
+            "--max-size-mib",
+            "0",
+            str(path),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Invalid value for '--max-size-mib' / '-m'" in result.output

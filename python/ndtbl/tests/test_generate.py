@@ -2,7 +2,11 @@ import numpy as np
 import pytest
 
 from ndtbl import FieldGroup, UniformAxis
-from ndtbl.generate import LinearFieldSpec, generate_group
+from ndtbl.generate import (
+    LinearFieldSpec,
+    estimate_generated_group_size,
+    generate_group,
+)
 
 
 def test_generate_group_builds_expected_shape_and_names() -> None:
@@ -100,3 +104,40 @@ def test_generate_group_rejects_empty_axes_or_fields() -> None:
 
     with pytest.raises(ValueError, match="at least one field"):
         generate_group(axes=(UniformAxis(0.0, 1.0, 2),), field_specs=())
+
+
+def test_estimate_generated_group_size_counts_points_fields_and_dtype() -> (
+    None
+):
+    estimate = estimate_generated_group_size(
+        axes=(UniformAxis(0.0, 1.0, 3), UniformAxis(10.0, 20.0, 2)),
+        field_specs=(
+            LinearFieldSpec("A", 1.0, (2.0, 0.0)),
+            LinearFieldSpec("B", 5.0, (0.0, -1.0)),
+        ),
+        dtype=np.float32,
+    )
+
+    assert estimate.point_count == 6
+    assert estimate.field_count == 2
+    assert estimate.payload_bytes == 48
+    assert estimate.estimated_file_bytes > estimate.payload_bytes
+
+
+def test_estimate_generated_group_size_scales_with_dtype() -> None:
+    float32_estimate = estimate_generated_group_size(
+        axes=(UniformAxis(0.0, 1.0, 4),),
+        field_specs=(LinearFieldSpec("A", 0.0, (1.0,)),),
+        dtype=np.float32,
+    )
+    float64_estimate = estimate_generated_group_size(
+        axes=(UniformAxis(0.0, 1.0, 4),),
+        field_specs=(LinearFieldSpec("A", 0.0, (1.0,)),),
+        dtype=np.float64,
+    )
+
+    assert float64_estimate.payload_bytes == 2 * float32_estimate.payload_bytes
+    assert (
+        float64_estimate.estimated_file_bytes
+        > float32_estimate.estimated_file_bytes
+    )

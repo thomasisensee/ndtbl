@@ -3,9 +3,16 @@ from pathlib import Path
 import click
 import numpy as np
 
-from .generate import LinearFieldSpec, generate_group
+from .generate import (
+    GenerationSizeEstimate,
+    LinearFieldSpec,
+    estimate_generated_group_size,
+    generate_group,
+)
 from .io import read_group, write_group
 from .model import ExplicitAxis, FieldGroup, GroupMetadata, UniformAxis
+
+DEFAULT_MAX_SIZE_MIB = 128.0
 
 
 def _format_axis(axis: UniformAxis | ExplicitAxis, axis_index: int) -> str:
@@ -124,6 +131,29 @@ def _parse_linear_fields(
     return output, tuple(parsed_specs)
 
 
+def _format_mib(size_bytes: int) -> str:
+    return f"{size_bytes / (1024 * 1024):.2f}"
+
+
+def _enforce_generation_size_limit(
+    estimate: GenerationSizeEstimate,
+    dtype_name: str,
+    max_size_mib: float,
+) -> None:
+    if estimate.estimated_file_mib <= max_size_mib:
+        return
+
+    raise click.ClickException(
+        "generated table exceeds the configured size limit: "
+        f"{estimate.point_count} points, "
+        f"{estimate.field_count} fields, "
+        f"dtype={dtype_name}, "
+        f"estimated size={_format_mib(estimate.estimated_file_bytes)} MiB, "
+        f"limit={max_size_mib:.2f} MiB. "
+        "Use --max-size-mib to raise the limit explicitly."
+    )
+
+
 @click.group()
 def main() -> None:
     """Read, inspect, and generate .ndtbl files."""
@@ -178,12 +208,21 @@ def inspect_command(file: Path, samples: int) -> None:
     default="float64",
     show_default=True,
 )
+@click.option(
+    "--max-size-mib",
+    "-m",
+    type=click.FloatRange(min=0.0, min_open=True),
+    default=DEFAULT_MAX_SIZE_MIB,
+    show_default=True,
+    help="Abort generation when the estimated file size exceeds this limit.",
+)
 @click.pass_context
 def generate_command(
     ctx: click.Context,
     output: Path | None,
     axis_specs: tuple[tuple[float, float, int], ...],
     dtype: str,
+    max_size_mib: float,
 ) -> None:
     """Generate a simple .ndtbl file with predefined linear fields.
 
@@ -198,6 +237,10 @@ def generate_command(
     if output is not None:
         extra_tokens = (str(output), *extra_tokens)
     output_path, linear_fields = _parse_linear_fields(extra_tokens, len(axes))
+    estimate = estimate_generated_group_size(
+        axes, linear_fields, np.dtype(dtype)
+    )
+    _enforce_generation_size_limit(estimate, dtype, max_size_mib)
     try:
         group = generate_group(axes, linear_fields, np.dtype(dtype))
         write_group(output_path, group)

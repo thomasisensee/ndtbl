@@ -8,9 +8,16 @@ from .model import FieldGroup, UniformAxis, normalize_dtype
 @dataclass(frozen=True, slots=True)
 class LinearFieldSpec:
     name: str
-    input_axis: int
-    a: float
-    b: float
+    offset: float
+    coefficients: tuple[float, ...]
+
+    def __post_init__(self) -> None:
+        coefficients = tuple(float(value) for value in self.coefficients)
+        if not coefficients:
+            raise ValueError("linear fields require at least one coefficient")
+        object.__setattr__(self, "name", str(self.name))
+        object.__setattr__(self, "offset", float(self.offset))
+        object.__setattr__(self, "coefficients", coefficients)
 
 
 def _linear_field(
@@ -18,16 +25,21 @@ def _linear_field(
     spec: LinearFieldSpec,
     dtype: np.dtype[np.float32] | np.dtype[np.float64],
 ) -> np.ndarray:
-    if not 0 <= spec.input_axis < len(axes):
+    if len(spec.coefficients) != len(axes):
         raise ValueError(
-            f"input axis {spec.input_axis} is out of range for{len(axes)} axes"
+            "linear field coefficient count does not match axis count"
         )
 
-    coordinates = axes[spec.input_axis].coordinates().astype(dtype, copy=False)
-    broadcast_shape = [1] * len(axes)
-    broadcast_shape[spec.input_axis] = axes[spec.input_axis].size
-    coordinates = coordinates.reshape(broadcast_shape)
-    return spec.a * coordinates + spec.b
+    axis_sizes = tuple(axis.size for axis in axes)
+    field = np.full(axis_sizes, spec.offset, dtype=dtype)
+
+    for axis_index, coefficient in enumerate(spec.coefficients):
+        coordinates = axes[axis_index].coordinates().astype(dtype, copy=False)
+        broadcast_shape = [1] * len(axes)
+        broadcast_shape[axis_index] = axes[axis_index].size
+        field += coefficient * coordinates.reshape(broadcast_shape)
+
+    return field
 
 
 GENERATOR_REGISTRY = {

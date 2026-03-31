@@ -44,6 +44,14 @@ def test_inspect_short_samples_option_limits_output(
     assert "sample[1]" not in result.output
 
 
+def test_generate_help_mentions_field_syntax(runner) -> None:
+    result = runner.invoke(main, ["generate", "--help"])
+
+    assert result.exit_code == 0
+    assert "Usage: main generate [OPTIONS] [OUTPUT]" in result.output
+    assert "--field-linear NAME OFFSET C0 [C1 ...]" in result.output
+
+
 def test_generate_writes_expected_file_with_long_options(
     runner, tmp_path
 ) -> None:
@@ -64,14 +72,14 @@ def test_generate_writes_expected_file_with_long_options(
             "2",
             "--field-linear",
             "A",
-            "0",
-            "2.0",
             "1.0",
+            "2.0",
+            "0.0",
             "--field-linear",
             "B",
-            "1",
-            "-1.0",
             "5.0",
+            "0.0",
+            "-1.0",
             "--dtype",
             "float32",
         ],
@@ -86,6 +94,40 @@ def test_generate_writes_expected_file_with_long_options(
     np.testing.assert_allclose(
         group.values[..., 0],
         np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]], dtype=np.float32),
+    )
+
+
+def test_generate_accepts_output_path_at_end(runner, tmp_path) -> None:
+    path = tmp_path / "generated-end.ndtbl"
+
+    result = runner.invoke(
+        main,
+        [
+            "generate",
+            "-a",
+            "0",
+            "1",
+            "2",
+            "-a",
+            "10",
+            "20",
+            "2",
+            "-f",
+            "A",
+            "1.0",
+            "2.0",
+            "0.0",
+            str(path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert f"wrote {path}" in result.output
+
+    group = read_group(path)
+    np.testing.assert_allclose(
+        group.values[..., 0],
+        np.array([[1.0, 1.0], [3.0, 3.0]]),
     )
 
 
@@ -105,9 +147,12 @@ def test_generate_writes_expected_file_with_short_options(
             "2",
             "-f",
             "A",
-            "0",
-            "3.0",
             "2.0",
+            "3.0",
+            "-f",
+            "B",
+            "1.0",
+            "0.0",
             "-t",
             "float64",
         ],
@@ -118,6 +163,7 @@ def test_generate_writes_expected_file_with_short_options(
 
     group = read_group(path)
     np.testing.assert_allclose(group.values[..., 0], np.array([2.0, 5.0]))
+    np.testing.assert_allclose(group.values[..., 1], np.array([1.0, 1.0]))
 
 
 def test_generate_requires_axis_option(runner, tmp_path) -> None:
@@ -130,9 +176,9 @@ def test_generate_requires_axis_option(runner, tmp_path) -> None:
             str(path),
             "--field-linear",
             "A",
-            "0",
             "1.0",
-            "0.0",
+            "1.0",
+            "2.0",
         ],
     )
 
@@ -142,8 +188,30 @@ def test_generate_requires_axis_option(runner, tmp_path) -> None:
     )
 
 
-def test_generate_reports_invalid_axis_reference(runner, tmp_path) -> None:
-    path = tmp_path / "bad-axis-ref.ndtbl"
+def test_generate_requires_output_path(runner) -> None:
+    result = runner.invoke(
+        main,
+        [
+            "generate",
+            "--axis",
+            "0",
+            "1",
+            "2",
+            "--field-linear",
+            "A",
+            "1.0",
+            "2.0",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "missing output path" in result.output
+
+
+def test_generate_reports_mismatched_coefficient_count(
+    runner, tmp_path
+) -> None:
+    path = tmp_path / "bad-coeff-count.ndtbl"
 
     result = runner.invoke(
         main,
@@ -156,11 +224,35 @@ def test_generate_reports_invalid_axis_reference(runner, tmp_path) -> None:
             "2",
             "--field-linear",
             "A",
-            "9",
             "1.0",
-            "0.0",
+            "1.0",
+            "2.0",
         ],
     )
 
     assert result.exit_code != 0
-    assert "input axis 9 is out of range" in result.output
+    assert "Error:" in result.output
+
+
+def test_generate_reports_non_numeric_coefficients(runner, tmp_path) -> None:
+    path = tmp_path / "bad-coeff-format.ndtbl"
+
+    result = runner.invoke(
+        main,
+        [
+            "generate",
+            str(path),
+            "--axis",
+            "0",
+            "1",
+            "2",
+            "--field-linear",
+            "A",
+            "1.0",
+            "1.0",
+            "not-a-number",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Error:" in result.output

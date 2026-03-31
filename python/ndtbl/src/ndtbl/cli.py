@@ -65,17 +65,63 @@ def _parse_axes(
 
 
 def _parse_linear_fields(
-    field_specs: tuple[tuple[str, int, float, float], ...],
-) -> tuple[LinearFieldSpec, ...]:
-    if not field_specs:
+    tokens: tuple[str, ...],
+    axis_count: int,
+) -> tuple[Path, tuple[LinearFieldSpec, ...]]:
+    parsed_specs: list[LinearFieldSpec] = []
+    output: Path | None = None
+    index = 0
+    while index < len(tokens):
+        option = tokens[index]
+        if option not in ("--field-linear", "-f"):
+            if output is not None:
+                raise click.UsageError(f"unexpected extra argument: {option}")
+            output = Path(option)
+            index += 1
+            continue
+        next_index = index + 1
+        expected_parts = axis_count + 2
+        next_index = index + 1 + expected_parts
+
+        parts = tokens[index + 1 : next_index]
+        if len(parts) != expected_parts:
+            raise click.UsageError(
+                "each --field-linear option requires NAME OFFSET and"
+                "one coefficient per axis"
+            )
+
+        try:
+            name = parts[0]
+            offset = float(parts[1])
+            coefficients = tuple(float(value) for value in parts[2:])
+        except ValueError as error:
+            raise click.UsageError(
+                "field offset and coefficients must be floats"
+            ) from error
+
+        if len(coefficients) != axis_count:
+            raise click.UsageError(
+                "field coefficient count must match the number of axes"
+            )
+
+        parsed_specs.append(
+            LinearFieldSpec(
+                name=name,
+                offset=offset,
+                coefficients=coefficients,
+            )
+        )
+        index = next_index
+
+    if output is None:
+        raise click.UsageError("missing output path")
+    if not parsed_specs:
         raise click.UsageError(
-            "at least one --field-linear NAME INPUT_AXIS A B optionis required"
+            "at least one --field-linear NAME OFFSET C0 [C1 ...] option"
+            "is required"
         )
 
-    return tuple(
-        LinearFieldSpec(name=name, input_axis=input_axis, a=a, b=b)
-        for name, input_axis, a, b in field_specs
-    )
+    return output, tuple(parsed_specs)
 
 
 @click.group()
@@ -105,8 +151,16 @@ def inspect_command(file: Path, samples: int) -> None:
     _echo_samples(group, samples)
 
 
-@main.command("generate")
-@click.argument("output", type=click.Path(dir_okay=False, path_type=Path))
+@main.command(
+    "generate",
+    context_settings={
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+    },
+)
+@click.argument(
+    "output", required=False, type=click.Path(dir_okay=False, path_type=Path)
+)
 @click.option(
     "--axis",
     "-a",
@@ -118,35 +172,35 @@ def inspect_command(file: Path, samples: int) -> None:
     help="Define one uniform axis. Repeat for each axis in storage order.",
 )
 @click.option(
-    "--field-linear",
-    "-f",
-    "field_specs",
-    multiple=True,
-    nargs=4,
-    type=(str, int, float, float),
-    metavar="NAME INPUT_AXIS A B",
-    help="Define one linear field A*x+B based on the chosen zero-based axis.",
-)
-@click.option(
     "--dtype",
     "-t",
     type=click.Choice(("float32", "float64"), case_sensitive=True),
     default="float64",
     show_default=True,
 )
+@click.pass_context
 def generate_command(
-    output: Path,
+    ctx: click.Context,
+    output: Path | None,
     axis_specs: tuple[tuple[float, float, int], ...],
-    field_specs: tuple[tuple[str, int, float, float], ...],
     dtype: str,
 ) -> None:
-    """Generate a simple .ndtbl file with predefined linear fields."""
+    """Generate a simple .ndtbl file with predefined linear fields.
+
+    Field syntax:
+      --field-linear NAME OFFSET C0 [C1 ...]
+
+    Provide one coefficient per axis in axis order.
+    """
 
     axes = _parse_axes(axis_specs)
-    linear_fields = _parse_linear_fields(field_specs)
+    extra_tokens = tuple(ctx.args)
+    if output is not None:
+        extra_tokens = (str(output), *extra_tokens)
+    output_path, linear_fields = _parse_linear_fields(extra_tokens, len(axes))
     try:
         group = generate_group(axes, linear_fields, np.dtype(dtype))
-        write_group(output, group)
+        write_group(output_path, group)
     except (OSError, ValueError) as error:
         raise click.ClickException(str(error)) from error
-    click.echo(f"wrote {output}")
+    click.echo(f"wrote {output_path}")

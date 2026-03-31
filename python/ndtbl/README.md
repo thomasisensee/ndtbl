@@ -52,6 +52,6 @@ Generate a small linear table:
 ndtbl generate output.ndtbl \
   --axis 0 1 3 \
   --axis 10 20 2 \
-  --field-linear A 0 2.0 1.0 \
-  --field-linear B 1 -1.0 5.0
+  --field-linear A 1.0 2.0 0.0 \
+  --field-linear B 5.0 0.0 -1.0
 ```

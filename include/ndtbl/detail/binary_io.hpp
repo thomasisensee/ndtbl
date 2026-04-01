@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <istream>
+#include <limits>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -116,7 +117,7 @@ template<class Value>
 inline void
 write_group_stream_impl(std::ostream& os,
                         const GroupMetadata& metadata,
-                        const std::vector<Value>& payload)
+                        const PayloadView<Value>& payload)
 {
   if (metadata.axes.size() != metadata.dimension) {
     throw std::invalid_argument(
@@ -170,8 +171,10 @@ write_group_stream_impl(std::ostream& os,
     write_string(os, metadata.field_names[field]);
   }
 
-  os.write(reinterpret_cast<const char*>(payload.data()),
-           static_cast<std::streamsize>(payload.size() * sizeof(Value)));
+  if (payload.byte_size() != 0) {
+    os.write(reinterpret_cast<const char*>(payload.byte_data()),
+             static_cast<std::streamsize>(payload.byte_size()));
+  }
   if (!os.good()) {
     throw std::runtime_error("failed to write ndtbl field payload");
   }
@@ -201,6 +204,15 @@ write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
   write_group_stream_impl(os, metadata, group.interleaved_values());
 }
 
+template<class Value>
+inline void
+write_group_stream_impl(std::ostream& os,
+                        const GroupMetadata& metadata,
+                        const std::vector<Value>& payload)
+{
+  write_group_stream_impl(os, metadata, payload_view(payload));
+}
+
 /**
  * @brief Validate that a stream begins with the ndtbl file magic header.
  *
@@ -217,14 +229,43 @@ verify_magic(std::istream& is)
   }
 }
 
+inline std::size_t
+checked_multiply_size(std::size_t lhs, std::size_t rhs, const std::string& what)
+{
+  if (lhs != 0 && rhs > std::numeric_limits<std::size_t>::max() / lhs) {
+    throw std::runtime_error("ndtbl " + what + " exceeds supported size");
+  }
+  return lhs * rhs;
+}
+
+inline std::size_t
+scalar_size(scalar_type type)
+{
+  if (type == scalar_type::float32) {
+    return sizeof(float);
+  }
+  if (type == scalar_type::float64) {
+    return sizeof(double);
+  }
+  throw std::runtime_error("unsupported ndtbl scalar type");
+}
+
+struct parsed_group_layout
+{
+  GroupMetadata metadata;
+  std::size_t payload_offset;
+  std::size_t value_count;
+  std::size_t payload_size;
+};
+
 /**
  * @brief Read metadata from a stream without reading the payload body.
  *
  * @param is Source stream positioned at the file start.
- * @return Parsed metadata record.
+ * @return Parsed metadata record plus payload location details.
  */
-inline GroupMetadata
-read_group_metadata_impl(std::istream& is)
+inline parsed_group_layout
+read_group_layout_impl(std::istream& is)
 {
   verify_magic(is);
   const std::uint32_t marker = read_pod<std::uint32_t>(is);
@@ -281,7 +322,25 @@ read_group_metadata_impl(std::istream& is)
     throw std::runtime_error("ndtbl point count does not match axis extents");
   }
 
-  return metadata;
+  const std::istream::pos_type payload_position = is.tellg();
+  if (payload_position < 0) {
+    throw std::runtime_error("failed to determine ndtbl payload offset");
+  }
+
+  parsed_group_layout layout;
+  layout.metadata = metadata;
+  layout.payload_offset = static_cast<std::size_t>(payload_position);
+  layout.value_count = checked_multiply_size(
+    metadata.point_count, metadata.field_count, "payload value count");
+  layout.payload_size = checked_multiply_size(
+    layout.value_count, scalar_size(metadata.value_type), "payload byte size");
+  return layout;
+}
+
+inline GroupMetadata
+read_group_metadata_impl(std::istream& is)
+{
+  return read_group_layout_impl(is).metadata;
 }
 
 /**

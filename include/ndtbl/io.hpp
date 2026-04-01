@@ -2,6 +2,7 @@
 
 #include "ndtbl/any_field_group.hpp"
 #include "ndtbl/detail/binary_io.hpp"
+#include "ndtbl/detail/mapped_payload.hpp"
 
 #include <fstream>
 #include <stdexcept>
@@ -151,7 +152,8 @@ read_group(const std::string& path)
     throw std::runtime_error("failed to open ndtbl input file: " + path);
   }
 
-  const GroupMetadata metadata = detail::read_group_metadata_impl(is);
+  const detail::parsed_group_layout layout = detail::read_group_layout_impl(is);
+  const GroupMetadata& metadata = layout.metadata;
   if (metadata.dimension != Dim) {
     throw std::runtime_error(
       "ndtbl file dimension does not match typed loader");
@@ -162,17 +164,39 @@ read_group(const std::string& path)
   const std::size_t value_count = metadata.point_count * metadata.field_count;
 
   if (metadata.value_type == scalar_type::float32) {
+#if NDTBL_ENABLE_MMAP
+    const std::shared_ptr<const std::uint8_t> payload_owner =
+      detail::map_payload_bytes(
+        path, layout.payload_offset, layout.payload_size);
+    return LoadedFieldGroup<Dim>(FieldGroup<float, Dim>(
+      grid,
+      metadata.field_names,
+      PayloadView<float>(payload_owner.get(), layout.value_count),
+      payload_owner));
+#else
     const std::vector<float> values =
       detail::read_payload<float>(is, value_count);
     return LoadedFieldGroup<Dim>(
-      FieldGroup<float, Dim>(grid, metadata.field_names, values));
+      FieldGroup<float, Dim>(grid, metadata.field_names, std::move(values)));
+#endif
   }
 
   if (metadata.value_type == scalar_type::float64) {
+#if NDTBL_ENABLE_MMAP
+    const std::shared_ptr<const std::uint8_t> payload_owner =
+      detail::map_payload_bytes(
+        path, layout.payload_offset, layout.payload_size);
+    return LoadedFieldGroup<Dim>(FieldGroup<double, Dim>(
+      grid,
+      metadata.field_names,
+      PayloadView<double>(payload_owner.get(), layout.value_count),
+      payload_owner));
+#else
     const std::vector<double> values =
       detail::read_payload<double>(is, value_count);
     return LoadedFieldGroup<Dim>(
-      FieldGroup<double, Dim>(grid, metadata.field_names, values));
+      FieldGroup<double, Dim>(grid, metadata.field_names, std::move(values)));
+#endif
   }
 
   throw std::runtime_error("unsupported ndtbl scalar type");

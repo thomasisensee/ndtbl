@@ -61,6 +61,33 @@ def _echo_samples(group: FieldGroup, samples: int) -> None:
         click.echo(f"sample[{sample_index}]: ({values})")
 
 
+def _validate_query_indices(
+    indices: tuple[int, ...], group: FieldGroup
+) -> tuple[int, ...]:
+    if len(indices) != group.dimension:
+        raise click.UsageError(
+            "query index count must match the table dimension: "
+            f"expected {group.dimension}, got {len(indices)}"
+        )
+
+    for axis_index, (index, axis_size) in enumerate(
+        zip(indices, group.axis_sizes, strict=True)
+    ):
+        if not 0 <= index < axis_size:
+            raise click.UsageError(
+                f"index for axis {axis_index} out of range: "
+                f"expected 0..{axis_size - 1}, got {index}"
+            )
+
+    return indices
+
+
+def _echo_query_values(group: FieldGroup, indices: tuple[int, ...]) -> None:
+    values = group.values[*indices, :]
+    for field_name, value in zip(group.field_names, values, strict=True):
+        click.echo(f"{field_name}: {value:g}")
+
+
 def _parse_axes(
     axis_specs: tuple[tuple[float, float, int], ...],
 ) -> tuple[UniformAxis, ...]:
@@ -186,6 +213,33 @@ def inspect_command(file: Path, samples: int) -> None:
         raise click.ClickException(str(error)) from error
     _echo_metadata(file, group.metadata())
     _echo_samples(group, samples)
+
+
+@main.command("query")
+@click.argument(
+    "file", type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
+@click.argument("indices", nargs=-1, type=int)
+@click.option(
+    "--metadata",
+    "-m",
+    is_flag=True,
+    help="Print metadata before the queried field values.",
+)
+def query_command(
+    file: Path, indices: tuple[int, ...], metadata: bool
+) -> None:
+    """Print field values at one point addressed by zero-based indices."""
+
+    try:
+        group = read_group(file)
+    except (OSError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+
+    validated_indices = _validate_query_indices(indices, group)
+    if metadata:
+        _echo_metadata(file, group.metadata())
+    _echo_query_values(group, validated_indices)
 
 
 @main.command(

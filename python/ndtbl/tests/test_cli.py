@@ -1,6 +1,6 @@
 import numpy as np
 
-from ndtbl import read_group, write_group
+from ndtbl import FieldGroup, UniformAxis, read_group, write_group
 from ndtbl.cli import main
 
 
@@ -52,6 +52,98 @@ def test_generate_help_mentions_field_syntax(runner) -> None:
     assert "-f, --field-linear NAME OFFSET C0 [C1 ...]" in result.output
     assert "--max-size-mib" in result.output
     assert "Field syntax:" not in result.output
+
+
+def test_query_help_mentions_metadata_and_indices(runner) -> None:
+    result = runner.invoke(main, ["query", "--help"])
+
+    assert result.exit_code == 0
+    assert "Usage: main query [OPTIONS] FILE [INDICES]..." in result.output
+    assert "--metadata" in result.output
+
+
+def test_query_prints_values_for_requested_point(
+    runner, tmp_path, sample_uniform_group
+) -> None:
+    path = tmp_path / "query.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    result = runner.invoke(main, ["query", str(path), "1", "2"])
+
+    assert result.exit_code == 0
+    assert result.output == "A: 10\nB: 11\n"
+
+
+def test_query_prints_values_for_requested_point_in_3d_table(
+    runner, tmp_path
+) -> None:
+    path = tmp_path / "query-3d.ndtbl"
+    group = FieldGroup(
+        axes=(
+            UniformAxis(0.0, 1.0, 2),
+            UniformAxis(0.0, 2.0, 3),
+            UniformAxis(0.0, 1.0, 2),
+        ),
+        field_names=("A", "B"),
+        values=np.arange(24, dtype=np.float64).reshape(2, 3, 2, 2),
+    )
+    write_group(path, group)
+
+    result = runner.invoke(main, ["query", str(path), "1", "2", "1"])
+
+    assert result.exit_code == 0
+    assert result.output == "A: 22\nB: 23\n"
+
+
+def test_query_metadata_prints_metadata_before_values(
+    runner, tmp_path, sample_uniform_group
+) -> None:
+    path = tmp_path / "query-metadata.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    result = runner.invoke(main, ["query", "-m", str(path), "0", "1"])
+
+    assert result.exit_code == 0
+    assert f"file: {path}" in result.output
+    assert "dimension: 2" in result.output
+    assert "field[0]: A" in result.output
+    assert result.output.rstrip().endswith("A: 2\nB: 3")
+
+
+def test_query_requires_matching_dimension(
+    runner, tmp_path, sample_uniform_group
+) -> None:
+    path = tmp_path / "query-dimension.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    result = runner.invoke(main, ["query", str(path), "1"])
+
+    assert result.exit_code != 0
+    assert "expected 2, got 1" in result.output
+
+
+def test_query_rejects_too_many_indices(
+    runner, tmp_path, sample_uniform_group
+) -> None:
+    path = tmp_path / "query-too-many.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    result = runner.invoke(main, ["query", str(path), "0", "1", "2"])
+
+    assert result.exit_code != 0
+    assert "expected 2, got 3" in result.output
+
+
+def test_query_rejects_out_of_range_indices(
+    runner, tmp_path, sample_uniform_group
+) -> None:
+    path = tmp_path / "query-range.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    result = runner.invoke(main, ["query", str(path), "2", "1"])
+
+    assert result.exit_code != 0
+    assert "index for axis 0 out of range" in result.output
 
 
 def test_generate_writes_expected_file_with_long_options(

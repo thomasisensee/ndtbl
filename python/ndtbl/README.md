@@ -8,17 +8,33 @@
 Pure-Python tools for reading, writing, inspecting, and generating `.ndtbl`
 files without depending on the C++ binaries.
 
-## Features
+The package is useful when you want to:
+
+- inspect an existing table on a machine without the C++ toolchain
+- generate small synthetic tables for tests, examples, and development
+- query one concrete grid point from the command line
+- read or write `.ndtbl` files directly from Python or NumPy workflows
+
+## 🔧 Features
 
 - Read `.ndtbl` metadata or full payloads
 - Write `.ndtbl` files compatible with the current C++ implementation
-- Inspect files from the command line
+- Inspect files from the command line with metadata and sample values
+- Query one point in a table by zero-based grid indices
 - Generate small predefined linear tables for development workflows
 
-## Installation
+## ⚙️ Installation
+
+Install from the package directory:
 
 ```bash
 python -m pip install .
+```
+
+Or install from PyPI:
+
+```bash
+python -m pip install ndtbl
 ```
 
 For development:
@@ -27,29 +43,87 @@ For development:
 python -m pip install -v -e .[lint,tests]
 ```
 
-## Python API
+## 🐍 Python API
+
+The core API revolves around `FieldGroup`, `UniformAxis`, `read_group`, and
+`write_group`.
 
 ```python
 import numpy as np
 
-from ndtbl import FieldGroup, UniformAxis, write_group
+from ndtbl import FieldGroup, UniformAxis, read_group, write_group
 
 group = FieldGroup(
     axes=(UniformAxis(0.0, 1.0, 3), UniformAxis(10.0, 20.0, 2)),
     field_names=("A", "B"),
-    values=np.zeros((3, 2, 2), dtype=np.float64),
+    values=np.array(
+        [
+            [[1.0, 10.0], [2.0, 20.0]],
+            [[3.0, 30.0], [4.0, 40.0]],
+            [[5.0, 50.0], [6.0, 60.0]],
+        ],
+        dtype=np.float64,
+    ),
 )
 
 write_group("example.ndtbl", group)
+
+loaded = read_group("example.ndtbl")
+print(loaded.field_names)
+print(loaded.values[1, 0, :])
 ```
 
-## CLI
+The `values` array shape is `axis_0 x axis_1 x ... x field`.
+
+## 💻 CLI
+
+The package installs one executable, `ndtbl`, with three subcommands:
+
+- `inspect` prints metadata and a configurable number of sample values
+- `query` prints the field values at one point addressed by zero-based indices
+- `generate` creates a simple synthetic table with linear fields
+
+Show the top-level help:
+
+```bash
+ndtbl --help
+```
+
+### `inspect`
 
 Inspect an existing file:
 
 ```bash
 ndtbl inspect example.ndtbl
 ```
+
+Limit the number of printed sample points:
+
+```bash
+ndtbl inspect example.ndtbl --samples 3
+```
+
+### `query`
+
+Query one point in the table using zero-based indices in axis order:
+
+```bash
+ndtbl query example.ndtbl 1 0
+```
+
+Print metadata before the queried values:
+
+```bash
+ndtbl query --metadata example.ndtbl 1 0
+```
+
+For a 3D table, provide three indices:
+
+```bash
+ndtbl query example-3d.ndtbl 1 2 0
+```
+
+### `generate`
 
 Generate a small linear table:
 
@@ -60,3 +134,25 @@ ndtbl generate output.ndtbl \
   --field-linear A 1.0 2.0 0.0 \
   --field-linear B 5.0 0.0 -1.0
 ```
+
+Use `float32` output instead of the default `float64`:
+
+```bash
+ndtbl generate output.ndtbl \
+  --axis 0 1 3 \
+  --field-linear A 1.0 2.0 \
+  --dtype float32
+```
+
+Raise or lower the generation safety limit:
+
+```bash
+ndtbl generate output.ndtbl \
+  --axis 0 1 100 \
+  --axis 0 1 100 \
+  --field-linear A 0.0 1.0 1.0 \
+  --max-size-mib 32
+```
+
+`--field-linear` expects `NAME OFFSET C0 [C1 ...]`, with one coefficient per
+axis in storage order.

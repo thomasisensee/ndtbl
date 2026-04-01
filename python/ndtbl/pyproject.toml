@@ -12,7 +12,7 @@ maintainers = [
     { name = "Thomas Isensee", email = "thomas.isensee@iwr.uni-heidelberg.de" },
 ]
 version = "0.0.1"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 classifiers = [
     "Intended Audience :: Science/Research",
@@ -54,7 +54,7 @@ testpaths = [
 ]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 exclude = "doc"

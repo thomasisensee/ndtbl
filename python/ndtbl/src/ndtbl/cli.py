@@ -19,10 +19,21 @@ class _HelpOnlyOption(click.Option):
     """Show an option in Click help without registering it for parsing."""
 
     def add_to_parser(self, parser, ctx) -> None:  # type: ignore[override]
+        """Skip parser registration while keeping the option in help output."""
         return None
 
 
 def _format_axis(axis: UniformAxis | ExplicitAxis, axis_index: int) -> str:
+    """Format one axis summary line for CLI output.
+
+    Args:
+        axis: Axis object to summarize.
+        axis_index: Zero-based axis index in storage order.
+
+    Returns:
+        Human-readable axis summary line.
+    """
+
     if isinstance(axis, UniformAxis):
         return (
             f"axis[{axis_index}]: uniform "
@@ -37,6 +48,13 @@ def _format_axis(axis: UniformAxis | ExplicitAxis, axis_index: int) -> str:
 
 
 def _echo_metadata(path: Path, metadata: GroupMetadata) -> None:
+    """Print group metadata in the CLI summary format.
+
+    Args:
+        path: Source file path shown in the output.
+        metadata: Metadata object to print.
+    """
+
     click.echo(f"file: {path}")
     click.echo(f"dimension: {metadata.dimension}")
     click.echo(f"fields: {metadata.field_count}")
@@ -51,6 +69,13 @@ def _echo_metadata(path: Path, metadata: GroupMetadata) -> None:
 
 
 def _echo_samples(group: FieldGroup, samples: int) -> None:
+    """Print a prefix of flattened sample values for inspection.
+
+    Args:
+        group: Field group whose values should be sampled.
+        samples: Maximum number of flattened points to print.
+    """
+
     flat_values = group.values.reshape(
         group.point_count, group.field_count, order="C"
     )
@@ -64,6 +89,16 @@ def _echo_samples(group: FieldGroup, samples: int) -> None:
 def _validate_query_indices(
     indices: tuple[int, ...], group: FieldGroup
 ) -> tuple[int, ...]:
+    """Validate CLI query indices against a field group.
+
+    Args:
+        indices: Zero-based point indices supplied on the command line.
+        group: Field group being queried.
+
+    Returns:
+        The validated indices tuple.
+    """
+
     if len(indices) != group.dimension:
         raise click.UsageError(
             "query index count must match the table dimension: "
@@ -83,6 +118,13 @@ def _validate_query_indices(
 
 
 def _echo_query_values(group: FieldGroup, indices: tuple[int, ...]) -> None:
+    """Print field values for one selected point.
+
+    Args:
+        group: Field group being queried.
+        indices: Zero-based point indices in axis order.
+    """
+
     values = group.values[*indices, :]
     for field_name, value in zip(group.field_names, values, strict=True):
         click.echo(f"{field_name}: {value:g}")
@@ -91,6 +133,15 @@ def _echo_query_values(group: FieldGroup, indices: tuple[int, ...]) -> None:
 def _parse_axes(
     axis_specs: tuple[tuple[float, float, int], ...],
 ) -> tuple[UniformAxis, ...]:
+    """Convert CLI axis tuples into validated uniform axes.
+
+    Args:
+        axis_specs: Repeated ``(min, max, size)`` tuples from Click.
+
+    Returns:
+        Parsed axes in storage order.
+    """
+
     if not axis_specs:
         raise click.UsageError(
             "at least one --axis MIN MAX SIZE option is required"
@@ -109,6 +160,16 @@ def _parse_linear_fields(
     tokens: tuple[str, ...],
     axis_count: int,
 ) -> tuple[Path, tuple[LinearFieldSpec, ...]]:
+    """Parse positional output and repeated linear field tokens.
+
+    Args:
+        tokens: Remaining CLI tokens after Click consumes declared options.
+        axis_count: Number of axes, used to validate coefficient counts.
+
+    Returns:
+        Tuple of output path and parsed field specifications.
+    """
+
     parsed_specs: list[LinearFieldSpec] = []
     output: Path | None = None
     index = 0
@@ -166,6 +227,7 @@ def _parse_linear_fields(
 
 
 def _format_mib(size_bytes: int) -> str:
+    """Format a byte count as a MiB string with two decimals."""
     return f"{size_bytes / (1024 * 1024):.2f}"
 
 
@@ -174,6 +236,14 @@ def _enforce_generation_size_limit(
     dtype_name: str,
     max_size_mib: float,
 ) -> None:
+    """Raise a CLI error when the estimated output is too large.
+
+    Args:
+        estimate: Estimated size information for the requested output.
+        dtype_name: Human-readable payload dtype name.
+        max_size_mib: User-configured maximum allowed output size.
+    """
+
     if estimate.estimated_file_mib <= max_size_mib:
         return
 
@@ -205,7 +275,12 @@ def main() -> None:
     type=click.IntRange(min=0),
 )
 def inspect_command(file: Path, samples: int) -> None:
-    """Print metadata and sample payload values from an .ndtbl file."""
+    """Print metadata and sample payload values from an .ndtbl file.
+
+    Args:
+        file: Path to the input ``.ndtbl`` file.
+        samples: Maximum number of flattened sample points to print.
+    """
 
     try:
         group = read_group(file)
@@ -229,7 +304,13 @@ def inspect_command(file: Path, samples: int) -> None:
 def query_command(
     file: Path, indices: tuple[int, ...], metadata: bool
 ) -> None:
-    """Print field values at one point addressed by zero-based indices."""
+    """Print field values at one point addressed by zero-based indices.
+
+    Args:
+        file: Path to the input ``.ndtbl`` file.
+        indices: Zero-based point indices in axis order.
+        metadata: Whether to print metadata before field values.
+    """
 
     try:
         group = read_group(file)
@@ -296,7 +377,15 @@ def generate_command(
     dtype: str,
     max_size_mib: float,
 ) -> None:
-    """Generate a simple .ndtbl file with predefined linear fields."""
+    """Generate a simple ``.ndtbl`` file with predefined linear fields.
+
+    Args:
+        ctx: Click context used to access extra field tokens.
+        output: Optional output path if provided before extra tokens.
+        axis_specs: Uniform axis definitions collected from ``--axis``.
+        dtype: Requested output dtype name.
+        max_size_mib: Safety limit for the estimated output file size.
+    """
 
     axes = _parse_axes(axis_specs)
     extra_tokens = tuple(ctx.args)

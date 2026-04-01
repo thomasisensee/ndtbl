@@ -40,6 +40,16 @@ TAG_TO_DTYPE = {
 
 
 def _read_exact(stream: BinaryIO, size: int) -> bytes:
+    """Read exactly ``size`` bytes from a binary stream.
+
+    Args:
+        stream: Open binary stream positioned at the next payload bytes.
+        size: Number of bytes to read.
+
+    Returns:
+        The requested byte sequence.
+    """
+
     data = stream.read(size)
     if len(data) != size:
         raise NdtblFormatError("unexpected end of ndtbl file")
@@ -47,58 +57,123 @@ def _read_exact(stream: BinaryIO, size: int) -> bytes:
 
 
 def _read_uint8(stream: BinaryIO) -> int:
+    """Read one unsigned 8-bit integer from a stream."""
     return UINT8.unpack(_read_exact(stream, UINT8.size))[0]
 
 
 def _read_uint16(stream: BinaryIO) -> int:
+    """Read one unsigned 16-bit integer from a stream."""
     return UINT16.unpack(_read_exact(stream, UINT16.size))[0]
 
 
 def _read_uint32(stream: BinaryIO) -> int:
+    """Read one unsigned 32-bit integer from a stream."""
     return UINT32.unpack(_read_exact(stream, UINT32.size))[0]
 
 
 def _read_uint64(stream: BinaryIO) -> int:
+    """Read one unsigned 64-bit integer from a stream."""
     return UINT64.unpack(_read_exact(stream, UINT64.size))[0]
 
 
 def _read_double(stream: BinaryIO) -> float:
+    """Read one IEEE-754 double-precision value from a stream."""
     return DOUBLE.unpack(_read_exact(stream, DOUBLE.size))[0]
 
 
 def _write_uint8(stream: BinaryIO, value: int) -> None:
+    """Write one unsigned 8-bit integer to a stream.
+
+    Args:
+        stream: Open binary stream positioned at the write offset.
+        value: Integer value to encode.
+    """
+
     stream.write(UINT8.pack(value))
 
 
 def _write_uint16(stream: BinaryIO, value: int) -> None:
+    """Write one unsigned 16-bit integer to a stream.
+
+    Args:
+        stream: Open binary stream positioned at the write offset.
+        value: Integer value to encode.
+    """
+
     stream.write(UINT16.pack(value))
 
 
 def _write_uint32(stream: BinaryIO, value: int) -> None:
+    """Write one unsigned 32-bit integer to a stream.
+
+    Args:
+        stream: Open binary stream positioned at the write offset.
+        value: Integer value to encode.
+    """
+
     stream.write(UINT32.pack(value))
 
 
 def _write_uint64(stream: BinaryIO, value: int) -> None:
+    """Write one unsigned 64-bit integer to a stream.
+
+    Args:
+        stream: Open binary stream positioned at the write offset.
+        value: Integer value to encode.
+    """
+
     stream.write(UINT64.pack(value))
 
 
 def _write_double(stream: BinaryIO, value: float) -> None:
+    """Write one double-precision float to a stream.
+
+    Args:
+        stream: Open binary stream positioned at the write offset.
+        value: Floating-point value to encode.
+    """
+
     stream.write(DOUBLE.pack(value))
 
 
 def _read_string(stream: BinaryIO) -> str:
+    """Read a length-prefixed UTF-8 string from a stream.
+
+    Args:
+        stream: Open binary stream positioned at the string header.
+
+    Returns:
+        The decoded string value.
+    """
+
     size = _read_uint64(stream)
     data = _read_exact(stream, size)
     return data.decode("utf-8")
 
 
 def _write_string(stream: BinaryIO, value: str) -> None:
+    """Write a length-prefixed UTF-8 string to a stream.
+
+    Args:
+        stream: Open binary stream positioned at the string header.
+        value: String value to encode.
+    """
+
     encoded = value.encode("utf-8")
     _write_uint64(stream, len(encoded))
     stream.write(encoded)
 
 
 def _read_axis(stream: BinaryIO) -> UniformAxis | ExplicitAxis:
+    """Read one serialized axis definition from a stream.
+
+    Args:
+        stream: Open binary stream positioned at an axis header.
+
+    Returns:
+        The decoded axis object.
+    """
+
     axis_tag = _read_uint8(stream)
     _read_uint8(stream)
     _read_uint16(stream)
@@ -119,6 +194,13 @@ def _read_axis(stream: BinaryIO) -> UniformAxis | ExplicitAxis:
 
 
 def _write_axis(stream: BinaryIO, axis: UniformAxis | ExplicitAxis) -> None:
+    """Write one axis definition to a stream.
+
+    Args:
+        stream: Open binary stream positioned at an axis header.
+        axis: Axis object to encode.
+    """
+
     if isinstance(axis, UniformAxis):
         _write_uint8(stream, AXIS_KIND_UNIFORM)
         _write_uint8(stream, 0)
@@ -137,6 +219,15 @@ def _write_axis(stream: BinaryIO, axis: UniformAxis | ExplicitAxis) -> None:
 
 
 def read_metadata_from_stream(stream: BinaryIO) -> GroupMetadata:
+    """Read ndtbl metadata from an already opened stream.
+
+    Args:
+        stream: Open binary stream positioned at the file start.
+
+    Returns:
+        Parsed metadata without loading the numeric payload.
+    """
+
     magic = _read_exact(stream, len(MAGIC))
     if magic != MAGIC:
         raise NdtblFormatError("invalid ndtbl magic header")
@@ -173,6 +264,15 @@ def read_metadata_from_stream(stream: BinaryIO) -> GroupMetadata:
 
 
 def read_group_from_stream(stream: BinaryIO) -> FieldGroup:
+    """Read an entire ndtbl file from an already opened stream.
+
+    Args:
+        stream: Open binary stream positioned at the file start.
+
+    Returns:
+        Parsed field group including payload values.
+    """
+
     metadata = read_metadata_from_stream(stream)
     value_count = metadata.point_count * metadata.field_count
     payload_size = value_count * metadata.dtype.itemsize
@@ -189,6 +289,13 @@ def read_group_from_stream(stream: BinaryIO) -> FieldGroup:
 
 
 def write_group_to_stream(stream: BinaryIO, group: FieldGroup) -> None:
+    """Write a field group to an already opened stream.
+
+    Args:
+        stream: Open binary stream positioned at the file start.
+        group: Field group to serialize.
+    """
+
     metadata = group.metadata()
 
     try:
@@ -217,8 +324,26 @@ def write_group_to_stream(stream: BinaryIO, group: FieldGroup) -> None:
 
 
 def open_for_read(path: str | Path) -> BinaryIO:
+    """Open an ndtbl file for binary reading.
+
+    Args:
+        path: File path to open.
+
+    Returns:
+        Binary file object opened in read mode.
+    """
+
     return Path(path).open("rb")
 
 
 def open_for_write(path: str | Path) -> BinaryIO:
+    """Open an ndtbl file for binary writing.
+
+    Args:
+        path: File path to open.
+
+    Returns:
+        Binary file object opened in write mode.
+    """
+
     return Path(path).open("wb")

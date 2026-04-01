@@ -15,6 +15,15 @@ STRING_LENGTH_SIZE = 8
 
 @dataclass(frozen=True, slots=True)
 class GenerationSizeEstimate:
+    """Summary of the expected size of a generated table.
+
+    Args:
+        point_count: Total number of grid points in the generated table.
+        field_count: Number of generated fields.
+        payload_bytes: Size of the numeric payload in bytes.
+        estimated_file_bytes: Approximate full file size in bytes.
+    """
+
     point_count: int
     field_count: int
     payload_bytes: int
@@ -22,16 +31,26 @@ class GenerationSizeEstimate:
 
     @property
     def estimated_file_mib(self) -> float:
+        """Return the estimated file size in mebibytes."""
         return self.estimated_file_bytes / (1024 * 1024)
 
 
 @dataclass(frozen=True, slots=True)
 class LinearFieldSpec:
+    """Definition of a generated linear field.
+
+    Args:
+        name: Field name written into the output table.
+        offset: Constant term added to every point.
+        coefficients: One coefficient per axis, in axis order.
+    """
+
     name: str
     offset: float
     coefficients: tuple[float, ...]
 
     def __post_init__(self) -> None:
+        """Normalize field definition values after initialization."""
         coefficients = tuple(float(value) for value in self.coefficients)
         if not coefficients:
             raise ValueError("linear fields require at least one coefficient")
@@ -45,6 +64,17 @@ def _linear_field(
     spec: LinearFieldSpec,
     dtype: np.dtype[np.float32] | np.dtype[np.float64],
 ) -> np.ndarray:
+    """Evaluate one linear field over a uniform grid.
+
+    Args:
+        axes: Uniform axes that define the grid.
+        spec: Linear field definition to evaluate.
+        dtype: Output dtype for the generated values.
+
+    Returns:
+        Array of field values shaped like the grid.
+    """
+
     if len(spec.coefficients) != len(axes):
         raise ValueError(
             "linear field coefficient count does not match axis count"
@@ -72,6 +102,17 @@ def generate_group(
     field_specs: tuple[LinearFieldSpec, ...],
     dtype: np.dtype[np.float32] | np.dtype[np.float64] | str = np.float64,
 ) -> FieldGroup:
+    """Generate an in-memory field group from linear field specifications.
+
+    Args:
+        axes: Uniform axes that define the generated grid.
+        field_specs: Linear field definitions in output field order.
+        dtype: Payload dtype for the generated values.
+
+    Returns:
+        A populated field group containing the generated values.
+    """
+
     if not axes:
         raise ValueError("at least one axis is required for generation")
     if not field_specs:
@@ -94,6 +135,17 @@ def estimate_generated_group_size(
     field_specs: tuple[LinearFieldSpec, ...],
     dtype: np.dtype[np.float32] | np.dtype[np.float64] | str = np.float64,
 ) -> GenerationSizeEstimate:
+    """Estimate the size of a generated ndtbl file.
+
+    Args:
+        axes: Uniform axes that define the generated grid.
+        field_specs: Linear field definitions in output field order.
+        dtype: Payload dtype for the generated values.
+
+    Returns:
+        Summary including point count, payload size, and file size estimate.
+    """
+
     if not axes:
         raise ValueError("at least one axis is required for generation")
     if not field_specs:

@@ -1,67 +1,164 @@
-# Welcome to ndtbl
+# ndtbl
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build](https://github.com/thomasisensee/ndtbl/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasisensee/ndtbl/actions)
 [![Documentation Status](https://readthedocs.org/projects/ndtbl/badge/)](https://ndtbl.readthedocs.io/)
 [![codecov](https://codecov.io/gh/thomasisensee/ndtbl/branch/main/graph/badge.svg)](https://codecov.io/gh/thomasisensee/ndtbl)
 
-# Prerequisites
+`ndtbl` is an n-dimensional table format and toolkit.
 
-Building ndtbl requires the following software installed:
+This repository currently contains two user-facing parts:
 
-* A C++14-compliant compiler
-* CMake `>= 3.23`
-* Doxygen (optional, documentation building is skipped if missing)
-* The testing framework [Catch2](https://github.com/catchorg/Catch2) for building the test suite
+- a header-only C++14 library in `include/ndtbl/`
+- locally built C++ command-line tools in `app/`
 
-# Building ndtbl
+It also contains a separate pure-Python package in `python/ndtbl/` for reading,
+writing, inspecting, querying, and generating `.ndtbl` files without the C++
+toolchain.
 
-The following sequence of commands builds ndtbl.
-It assumes that your current working directory is the top-level directory
-of the freshly cloned repository:
+## 🗂️ Layout
 
-```
-cmake -B build
+- `include/ndtbl/`: public C++ headers
+- `app/`: C++ command-line tools built by CMake
+- `tests/`: Catch2-based C++ test suite
+- `doc/`: Sphinx and Doxygen documentation
+- `python/ndtbl/`: pure-Python package and `ndtbl` CLI
+
+## 🖥️ Which interface to use
+
+Use the C++ library when you want to integrate `.ndtbl` directly into a C++
+application.
+
+Use the C++ tools when you want to convert OpenFOAM text tables or inspect
+`.ndtbl` files from this repository checkout. These tools are not prebuilt;
+they become available only after running the local CMake build.
+
+Use the Python package when you want a pip-installable workflow or a ready-made
+CLI for:
+
+- `ndtbl inspect`
+- `ndtbl query`
+- `ndtbl generate`
+
+See `python/ndtbl/README.md` for Python package details.
+
+## 📋 Prerequisites
+
+Building the C++ project requires:
+
+- a C++14-compliant compiler for the header-only library interface
+- a compiler with C++20 support for the executables in `app/`
+- CMake `>= 3.23`
+- Doxygen only if you want to build the documentation
+- Catch2 only if you want to build the optional C++ test suite
+
+## 🛠️ Build
+
+From the top-level `ndtbl/` directory:
+
+```bash
+cmake -B build -Dndtbl_BUILD_TESTING=OFF -Dndtbl_BUILD_DOCS=OFF
 cmake --build build
 ```
 
-The build process can be customized with the following CMake variables,
-which can be set by adding `-D<var>={ON, OFF}` to the `cmake` call:
+This produces the C++ command-line tools in `build/app/`:
 
-* `ndtbl_BUILD_TESTING`: Enable building of the test suite (default: `ON`)
-* `ndtbl_BUILD_DOCS`: Enable building the documentation (default: `ON`)
+- `build/app/ndtbl-convert`
+- `build/app/ndtbl-inspect`
 
+Relevant CMake options:
 
+- `ndtbl_BUILD_TESTING`: build the C++ test suite, default `OFF`
+- `ndtbl_BUILD_DOCS`: build the documentation, default `ON` for top-level builds
 
-# Testing ndtbl
+If you want to install the C++ headers and CMake package metadata:
 
-When built according to the above explanation (with `-Dndtbl_BUILD_TESTING=ON`),
-the C++ test suite of `ndtbl` can be run using
-`ctest` from the build directory:
-
+```bash
+cmake --install build --prefix /desired/prefix
 ```
+
+## ⚙️ C++ Tool Workflow
+
+Convert one or more OpenFOAM text tables into a single `.ndtbl` file:
+
+```bash
+./build/app/ndtbl-convert output.ndtbl Table1_table Table2_table
+```
+
+Choose the stored value precision explicitly:
+
+```bash
+./build/app/ndtbl-convert --precision float output.ndtbl Table1_table Table2_table
+```
+
+Inspect the generated file:
+
+```bash
+./build/app/ndtbl-inspect output.ndtbl
+```
+
+These commands use the C++ executables built in the previous step. They are not
+available before `cmake --build build`.
+
+## 🐍 Python Package
+
+The repository also ships a separate Python package in `python/ndtbl/`.
+
+That package installs a different CLI executable named `ndtbl`, with the
+subcommands:
+
+- `inspect`
+- `query`
+- `generate`
+
+Install it from the package directory:
+
+```bash
+cd python/ndtbl
+python -m pip install .
+```
+
+After that, the Python CLI is available as:
+
+```bash
+ndtbl --help
+```
+
+See `python/ndtbl/README.md` for usage examples and Python API details.
+
+## 🧪 Testing
+
+Enable the C++ test suite during configuration:
+
+```bash
+cmake -B build -Dndtbl_BUILD_TESTING=ON
+cmake --build build
+```
+
+Then run:
+
+```bash
 cd build
-ctest
+ctest --output-on-failure
 ```
 
+## 📖 Documentation
 
-# Documentation
+Online documentation is available at
+[ndtbl.readthedocs.io](https://ndtbl.readthedocs.io/).
 
-ndtbl provides a Sphinx-based documentation, that can be browsed [online at readthedocs.org](https://ndtbl.readthedocs.io).
-To build it locally, first ensure the requirements are installed by running this command from the top-level source directory:
+To build the docs locally, first install the documentation requirements from
+the top-level `ndtbl/` directory:
 
+```bash
+python -m pip install -r doc/requirements.txt
 ```
-pip install -r doc/requirements.txt
-```
 
-Then build the sphinx documentation from the top-level directory:
+Then build the Sphinx target:
 
-```
+```bash
+cmake -B build -Dndtbl_BUILD_DOCS=ON -Dndtbl_BUILD_TESTING=OFF
 cmake --build build --target sphinx-doc
 ```
 
-The web documentation can then be browsed by opening `build/doc/sphinx/index.html` in your browser.
-
-## Acknowledgments
-
-This repository was set up using the [SSC Cookiecutter for C++ Packages](https://github.com/ssciwr/cookiecutter-cpp-project).
+Open `build/doc/sphinx/index.html` in a browser to inspect the generated site.

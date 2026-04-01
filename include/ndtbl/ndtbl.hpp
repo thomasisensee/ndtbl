@@ -1,17 +1,14 @@
 #pragma once
 
-namespace ndtbl {
+#include "ndtbl/any_field_group.hpp"
+#include "ndtbl/axis.hpp"
+#include "ndtbl/field_group.hpp"
+#include "ndtbl/grid.hpp"
+#include "ndtbl/io.hpp"
+#include "ndtbl/metadata.hpp"
+#include "ndtbl/types.hpp"
 
-/** @brief A very interesting function!
- *
- * This function is of course just a self-explanatory placeholder,
- * but surprisingly often, things aren't this easy. You should
- * therefore *really* document your C++ code with Doxygen!
- *
- * @param x The number to increase
- * @returns the successor of x
+/**
+ * @file
+ * @brief Umbrella include for the complete public ndtbl API.
  */
-int
-add_one(int x);
-
-} // namespace ndtbl

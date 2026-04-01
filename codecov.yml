@@ -1,10 +1,30 @@
 codecov:
-  require_ci_to_pass: yes
+  require_ci_to_pass: true
 
 coverage:
   precision: 2
   round: down
   range: "70...100"
+  status:
+    project:
+      cpp:
+        target: auto
+        flags:
+          - cpp
+      python:
+        target: auto
+        flags:
+          - python
+
+flags:
+  cpp:
+    paths:
+      - include/
+    carryforward: true
+  python:
+    paths:
+      - python/ndtbl/src/ndtbl/
+    carryforward: true
 
 parsers:
   gcov:
@@ -15,11 +35,13 @@ parsers:
       macro: no
 
 comment:
-  layout: "reach,diff,flags,files,footer"
+  layout: "condensed_header,flags,condensed_files,condensed_footer"
   behavior: default
-  require_changes: no
+  require_changes: false
 
 ignore:
-  - app
-  - "**/tests"
-  - "**/Catch2"
+  - "app/**"
+  - "doc/**"
+  - "tests/**"
+  - "python/ndtbl/doc/**"
+  - "python/ndtbl/tests/**"

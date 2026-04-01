@@ -1,0 +1,141 @@
+import struct
+
+import numpy as np
+import pytest
+
+from ndtbl import (
+    ExplicitAxis,
+    FieldGroup,
+    NdtblFormatError,
+    read_group,
+    read_metadata,
+    write_group,
+)
+
+
+def test_read_write_round_trip_with_uniform_axes(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "uniform.ndtbl"
+
+    write_group(path, sample_uniform_group)
+    loaded = read_group(path)
+
+    assert loaded.axes == sample_uniform_group.axes
+    assert loaded.field_names == sample_uniform_group.field_names
+    assert loaded.dtype == sample_uniform_group.dtype
+    np.testing.assert_array_equal(loaded.values, sample_uniform_group.values)
+
+
+def test_read_write_round_trip_with_explicit_axes(
+    tmp_path,
+    sample_explicit_group: FieldGroup,
+) -> None:
+    path = tmp_path / "explicit.ndtbl"
+
+    write_group(path, sample_explicit_group)
+    loaded = read_group(path)
+
+    assert isinstance(loaded.axes[0], ExplicitAxis)
+    assert loaded.axes == sample_explicit_group.axes
+    assert loaded.field_names == sample_explicit_group.field_names
+    assert loaded.dtype == np.dtype(np.float32)
+    np.testing.assert_allclose(loaded.values, sample_explicit_group.values)
+
+
+def test_read_metadata_returns_expected_summary(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "metadata.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    metadata = read_metadata(path)
+
+    assert metadata.dimension == 2
+    assert metadata.field_count == 2
+    assert metadata.axis_sizes == (2, 3)
+    assert metadata.point_count == 6
+    assert metadata.field_names == ("A", "B")
+    assert metadata.dtype == np.dtype(np.float64)
+
+
+def test_read_group_preserves_point_major_storage_order(tmp_path) -> None:
+    group = FieldGroup(
+        axes=(ExplicitAxis([0.0, 1.0]), ExplicitAxis([10.0, 20.0])),
+        field_names=("A", "B"),
+        values=np.array(
+            [
+                [[0.0, 1.0], [2.0, 3.0]],
+                [[4.0, 5.0], [6.0, 7.0]],
+            ],
+            dtype=np.float64,
+        ),
+    )
+    path = tmp_path / "order.ndtbl"
+
+    write_group(path, group)
+    loaded = read_group(path)
+
+    np.testing.assert_array_equal(
+        loaded.values.reshape(-1, 2), group.values.reshape(-1, 2)
+    )
+
+
+def test_read_metadata_rejects_bad_magic(tmp_path) -> None:
+    path = tmp_path / "bad-magic.ndtbl"
+    path.write_bytes(b"not-ndtbl")
+
+    with pytest.raises(NdtblFormatError, match="invalid ndtbl magic header"):
+        read_metadata(path)
+
+
+def test_read_metadata_rejects_unsupported_version(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "bad-version.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    data = bytearray(path.read_bytes())
+    data[12] = 99
+    path.write_bytes(data)
+
+    with pytest.raises(NdtblFormatError, match="unsupported ndtbl version"):
+        read_metadata(path)
+
+
+def test_read_metadata_rejects_unsupported_scalar_tag(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "bad-scalar.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    data = bytearray(path.read_bytes())
+    data[13] = 99
+    path.write_bytes(data)
+
+    with pytest.raises(
+        NdtblFormatError, match="unsupported ndtbl scalar type"
+    ):
+        read_metadata(path)
+
+
+def test_read_metadata_rejects_point_count_mismatch(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "bad-point-count.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    data = bytearray(path.read_bytes())
+    struct.pack_into("=Q", data, 32, 999)
+    path.write_bytes(data)
+
+    with pytest.raises(
+        NdtblFormatError,
+        match="ndtbl point count does not match axis extents",
+    ):
+        read_metadata(path)

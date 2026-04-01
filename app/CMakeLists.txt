@@ -1,14 +1,39 @@
-# Declare an executable target
-add_executable(ndtbl_app)
-
-# Add source files to the executable target
-target_sources(ndtbl_app
-  PRIVATE
-    ndtbl_app.cpp
+# Add convertet tool executable
+add_executable(ndtbl_convert
+  ndtbl_convert.cpp
 )
 
-# Link the executable against the library
-target_link_libraries(ndtbl_app
+target_link_libraries(ndtbl_convert
   PRIVATE
     ndtbl
+)
+
+target_compile_features(ndtbl_convert
+  PRIVATE
+    cxx_std_20
+)
+
+set_target_properties(ndtbl_convert
+  PROPERTIES
+    OUTPUT_NAME "ndtbl-convert"
+)
+
+# Add inspect tool executable
+add_executable(ndtbl_inspect
+  ndtbl_inspect.cpp
+)
+
+target_link_libraries(ndtbl_inspect
+  PRIVATE
+    ndtbl
+)
+
+target_compile_features(ndtbl_inspect
+  PRIVATE
+    cxx_std_20
+)
+
+set_target_properties(ndtbl_inspect
+  PROPERTIES
+    OUTPUT_NAME "ndtbl-inspect"
 )

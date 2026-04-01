@@ -18,8 +18,31 @@ else()
   option(ndtbl_BUILD_DOCS "Enable building of documentation" OFF)
 endif()
 
-# Compile the library
-add_subdirectory(src)
+# Add an interface target for the header-only library
+add_library(ndtbl INTERFACE)
+
+# Add the public headers that belong to this library
+target_sources(ndtbl
+  INTERFACE
+    FILE_SET HEADERS
+    BASE_DIRS include
+    FILES
+      include/ndtbl/types.hpp
+      include/ndtbl/axis.hpp
+      include/ndtbl/grid.hpp
+      include/ndtbl/field_group.hpp
+      include/ndtbl/any_field_group.hpp
+      include/ndtbl/metadata.hpp
+      include/ndtbl/io.hpp
+      include/ndtbl/ndtbl.hpp
+      include/ndtbl/detail/binary_io.hpp
+)
+
+# Request a minimum C++ standard for this target
+target_compile_features(ndtbl
+  INTERFACE
+    cxx_std_14
+)
 
 if(PROJECT_IS_TOP_LEVEL)
   # Compile the application executable

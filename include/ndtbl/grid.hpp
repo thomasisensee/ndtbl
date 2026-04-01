@@ -20,11 +20,15 @@ template<std::size_t Dim>
 class PreparedQuery
 {
 public:
+  /// Number of dimensions.
   static constexpr std::size_t dimensions = Dim;
+  /// Number of interpolation corners in one hypercube stencil.
   static constexpr std::size_t corners = std::size_t(1) << Dim;
 
   /**
    * @brief Return the flat storage indices of all interpolation corners.
+   *
+   * @return Flat point indices for all interpolation corners.
    */
   const std::array<std::size_t, corners>& point_indices() const
   {
@@ -33,6 +37,9 @@ public:
 
   /**
    * @brief Return the flat storage index by corner index.
+   *
+   * @param index Corner index in the prepared query.
+   * @return Flat point index of the selected corner.
    */
   std::size_t point_index(std::size_t index) const
   {
@@ -41,11 +48,16 @@ public:
 
   /**
    * @brief Return the interpolation weights of all interpolation corners.
+   *
+   * @return Interpolation weights for all corners.
    */
   const std::array<double, corners>& weights() const { return weights_; }
 
   /**
    * @brief Return the interpolation weights by corner index.
+   *
+   * @param index Corner index in the prepared query.
+   * @return Interpolation weight for the selected corner.
    */
   double weight(std::size_t index) const { return weights_[index]; }
 
@@ -64,6 +76,7 @@ template<std::size_t Dim>
 class Grid
 {
 public:
+  /// Number of dimensions.
   static constexpr std::size_t dimensions = Dim;
 
   Grid()
@@ -75,6 +88,8 @@ public:
 
   /**
    * @brief Construct a grid from one axis descriptor per dimension.
+   *
+   * @param axes Axis descriptors in dimension order.
    */
   explicit Grid(const std::array<Axis, Dim>& axes)
     : axes_(axes)
@@ -92,41 +107,61 @@ public:
 
   /**
    * @brief Return all axis descriptors.
+   *
+   * @return Axis descriptors in dimension order.
    */
   const std::array<Axis, Dim>& axes() const { return axes_; }
 
   /**
    * @brief Return one axis descriptor by dimension index.
+   *
+   * @param index Dimension index.
+   * @return Axis descriptor for the selected dimension.
    */
   const Axis& axis(std::size_t index) const { return axes_[index]; }
 
   /**
    * @brief Return the extent of each dimension.
+   *
+   * @return Grid extents in dimension order.
    */
   const std::array<std::size_t, Dim>& extents() const { return extents_; }
 
   /**
    * @brief Return the extent by dimension index.
+   *
+   * @param index Dimension index.
+   * @return Number of support points along the selected dimension.
    */
   std::size_t extent(std::size_t index) const { return extents_[index]; }
 
   /**
    * @brief Return the flat-memory strides of each dimension.
+   *
+   * @return Flat-memory strides in dimension order.
    */
   const std::array<std::size_t, Dim>& strides() const { return strides_; }
 
   /**
    * @brief Return the flat-memory stride by dimension index.
+   *
+   * @param index Dimension index.
+   * @return Flat-memory stride for the selected dimension.
    */
   std::size_t stride(std::size_t index) const { return strides_[index]; }
 
   /**
    * @brief Return the total number of support points in the grid.
+   *
+   * @return Total point count across all dimensions.
    */
   std::size_t point_count() const { return point_count_; }
 
   /**
    * @brief Check whether another grid uses the same axes.
+   *
+   * @param other Grid to compare against.
+   * @return `true` if all axes are equivalent.
    */
   bool equivalent(const Grid& other) const
   {
@@ -142,6 +177,9 @@ public:
    * @brief Precompute the interpolation stencil for one query point.
    *
    * This is the key operation to reuse when several fields share a grid.
+   *
+   * @param coordinates Query coordinates in axis order.
+   * @return Prepared query containing corner indices and weights.
    */
   PreparedQuery<Dim> prepare(const std::array<double, Dim>& coordinates) const
   {

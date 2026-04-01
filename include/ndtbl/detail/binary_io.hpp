@@ -16,9 +16,26 @@
 namespace ndtbl {
 namespace detail {
 
+/**
+ * @brief Internal magic header written at the start of every ndtbl file.
+ *
+ * This constant is part of the binary file format implementation and is not
+ * intended to be consumed directly by library users.
+ */
 static const char file_magic[8] = { 'N', 'D', 'T', 'B', 'L', '1', '\0', '\0' };
+
+/**
+ * @brief Internal endianness sentinel used to reject unsupported byte orders.
+ */
 static const std::uint32_t endian_marker = 0x01020304u;
 
+/**
+ * @brief Write one plain-old-data value to a binary stream.
+ *
+ * @tparam Pod Plain-old-data value type to serialize.
+ * @param os Destination stream in binary mode.
+ * @param value Value to write.
+ */
 template<class Pod>
 inline void
 write_pod(std::ostream& os, const Pod& value)
@@ -29,6 +46,13 @@ write_pod(std::ostream& os, const Pod& value)
   }
 }
 
+/**
+ * @brief Read one plain-old-data value from a binary stream.
+ *
+ * @tparam Pod Plain-old-data value type to deserialize.
+ * @param is Source stream in binary mode.
+ * @return Deserialized value of type `Pod`.
+ */
 template<class Pod>
 inline Pod
 read_pod(std::istream& is)
@@ -41,6 +65,12 @@ read_pod(std::istream& is)
   return value;
 }
 
+/**
+ * @brief Write a length-prefixed UTF-8 string to a binary stream.
+ *
+ * @param os Destination stream in binary mode.
+ * @param value String to serialize.
+ */
 inline void
 write_string(std::ostream& os, const std::string& value)
 {
@@ -52,6 +82,12 @@ write_string(std::ostream& os, const std::string& value)
   }
 }
 
+/**
+ * @brief Read a length-prefixed string from a binary stream.
+ *
+ * @param is Source stream in binary mode.
+ * @return Decoded string value.
+ */
 inline std::string
 read_string(std::istream& is)
 {
@@ -68,6 +104,14 @@ read_string(std::istream& is)
   return value;
 }
 
+/**
+ * @brief Internal implementation for writing raw metadata and payload data.
+ *
+ * @tparam Value Scalar payload type stored in the payload vector.
+ * @param os Destination stream in binary mode.
+ * @param metadata File metadata describing the payload layout.
+ * @param payload Point-major interleaved field payload.
+ */
 template<class Value>
 inline void
 write_group_stream_impl(std::ostream& os,
@@ -133,6 +177,16 @@ write_group_stream_impl(std::ostream& os,
   }
 }
 
+/**
+ * @brief Internal implementation for writing a typed field group.
+ *
+ * @tparam Value Scalar payload type stored in the group.
+ * @tparam Dim Grid dimensionality of the group.
+ * @param os Destination stream in binary mode.
+ * @param group Typed field group to serialize.
+ * @see write_group_stream_impl(std::ostream&, const GroupMetadata&,
+ *                              const std::vector<Value>&)
+ */
 template<class Value, std::size_t Dim>
 inline void
 write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
@@ -147,6 +201,11 @@ write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
   write_group_stream_impl(os, metadata, group.interleaved_values());
 }
 
+/**
+ * @brief Validate that a stream begins with the ndtbl file magic header.
+ *
+ * @param is Source stream positioned at the file start.
+ */
 inline void
 verify_magic(std::istream& is)
 {
@@ -158,6 +217,12 @@ verify_magic(std::istream& is)
   }
 }
 
+/**
+ * @brief Read metadata from a stream without reading the payload body.
+ *
+ * @param is Source stream positioned at the file start.
+ * @return Parsed metadata record.
+ */
 inline GroupMetadata
 read_group_metadata_impl(std::istream& is)
 {
@@ -219,6 +284,14 @@ read_group_metadata_impl(std::istream& is)
   return metadata;
 }
 
+/**
+ * @brief Read a contiguous payload block from a binary stream.
+ *
+ * @tparam Value Scalar payload type to deserialize.
+ * @param is Source stream positioned at the start of the payload.
+ * @param value_count Number of scalar values to read.
+ * @return Payload vector with `value_count` entries.
+ */
 template<class Value>
 inline std::vector<Value>
 read_payload(std::istream& is, std::size_t value_count)
@@ -232,6 +305,13 @@ read_payload(std::istream& is, std::size_t value_count)
   return values;
 }
 
+/**
+ * @brief Convert a dynamic axis vector to a fixed-size array.
+ *
+ * @tparam Dim Expected number of axes.
+ * @param axes Dynamic axis list to convert.
+ * @return Fixed-size axis array with `Dim` entries.
+ */
 template<std::size_t Dim>
 inline std::array<Axis, Dim>
 fixed_axes(const std::vector<Axis>& axes)

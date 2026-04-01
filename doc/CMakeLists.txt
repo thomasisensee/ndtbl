@@ -5,9 +5,8 @@ set(DOXYGEN_GENERATE_XML YES)
 
 doxygen_add_docs(ndtbl-doxygen
   ${CMAKE_SOURCE_DIR}/include
-  ${CMAKE_SOURCE_DIR}/src
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMENT Building doxygen documentation...
+  COMMENT "Building doxygen documentation..."
 )
 
 add_custom_target(ndtbl-sphinx-doc

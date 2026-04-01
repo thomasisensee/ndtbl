@@ -27,6 +27,9 @@ enum class scalar_type : std::uint8_t
  * @brief Map a supported C++ scalar type to the ndtbl on-disk type tag.
  *
  * Only `float` and `double` are supported in the current implementation.
+ *
+ * @tparam Value Supported scalar payload type.
+ * @return Corresponding ndtbl scalar type tag.
  */
 template<class Value>
 constexpr scalar_type

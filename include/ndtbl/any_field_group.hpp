@@ -28,16 +28,36 @@ template<std::size_t Dim>
 class LoadedFieldGroup
 {
 public:
+  /**
+   * @brief Construct an empty runtime-erased group handle.
+   */
   LoadedFieldGroup() {}
 
+  /**
+   * @brief Construct a runtime-erased wrapper from a typed field group.
+   *
+   * @tparam Value Scalar payload type stored in the source group.
+   * @param group Typed field group to wrap.
+   * @see FieldGroup
+   */
   template<class Value>
   explicit LoadedFieldGroup(const FieldGroup<Value, Dim>& group)
     : impl_(std::make_shared<Model<Value>>(group))
   {
   }
 
+  /**
+   * @brief Check whether this wrapper currently holds a group instance.
+   *
+   * @return `true` if no group is loaded, otherwise `false`.
+   */
   bool empty() const { return !impl_; }
 
+  /**
+   * @brief Return the number of fields stored per grid point.
+   *
+   * @return Number of named fields in the wrapped group.
+   */
   std::size_t field_count() const
   {
     if (!impl_) {
@@ -46,6 +66,11 @@ public:
     return impl_->field_count();
   }
 
+  /**
+   * @brief Return the scalar payload type of the wrapped group.
+   *
+   * @return Runtime payload type tag.
+   */
   scalar_type value_type() const
   {
     if (!impl_) {
@@ -54,6 +79,11 @@ public:
     return impl_->value_type();
   }
 
+  /**
+   * @brief Return field names in storage order.
+   *
+   * @return Copy of the field name list.
+   */
   std::vector<std::string> field_names() const
   {
     if (!impl_) {
@@ -62,6 +92,11 @@ public:
     return impl_->field_names();
   }
 
+  /**
+   * @brief Return the axis descriptors of the wrapped grid.
+   *
+   * @return One axis descriptor per dimension.
+   */
   std::array<Axis, Dim> axes() const
   {
     if (!impl_) {
@@ -70,6 +105,12 @@ public:
     return impl_->axes();
   }
 
+  /**
+   * @brief Resolve a field name to its storage index.
+   *
+   * @param field_name Field name to look up.
+   * @return Zero-based field index in storage order.
+   */
   std::size_t field_index(const std::string& field_name) const
   {
     if (!impl_) {
@@ -78,6 +119,13 @@ public:
     return impl_->field_index(field_name);
   }
 
+  /**
+   * @brief Evaluate all stored fields at one coordinate tuple.
+   *
+   * @param coordinates Query coordinates in grid axis order.
+   * @return Interpolated field values converted to `double`.
+   * @see evaluate_all_into
+   */
   std::vector<double> evaluate_all(
     const std::array<double, Dim>& coordinates) const
   {
@@ -86,6 +134,13 @@ public:
     return values;
   }
 
+  /**
+   * @brief Evaluate all stored fields into caller-provided output storage.
+   *
+   * @param coordinates Query coordinates in grid axis order.
+   * @param values Output buffer with space for `field_count()` values.
+   * @see evaluate_all
+   */
   void evaluate_all_into(const std::array<double, Dim>& coordinates,
                          double* values) const
   {
@@ -95,6 +150,12 @@ public:
     impl_->evaluate_all_into(coordinates, values);
   }
 
+  /**
+   * @brief Write the wrapped group to an already opened binary stream.
+   *
+   * @param os Destination stream in binary mode.
+   * @see write_group_stream
+   */
   void write(std::ostream& os) const
   {
     if (!impl_) {
@@ -163,6 +224,9 @@ private:
   std::shared_ptr<const Concept> impl_;
 };
 
+/**
+ * @brief Backward-compatible alias for the runtime-erased loaded group type.
+ */
 template<std::size_t Dim>
 using AnyFieldGroup = LoadedFieldGroup<Dim>;
 

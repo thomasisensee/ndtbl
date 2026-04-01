@@ -50,26 +50,36 @@ public:
 
   /**
    * @brief Return the shared grid metadata.
+   *
+   * @return Shared interpolation grid.
    */
   const Grid<Dim>& grid() const { return grid_; }
 
   /**
    * @brief Return the number of stored fields.
+   *
+   * @return Number of named fields.
    */
   std::size_t field_count() const { return field_names_.size(); }
 
   /**
    * @brief Return all field names in storage order.
+   *
+   * @return Field names in payload order.
    */
   const std::vector<std::string>& field_names() const { return field_names_; }
 
   /**
    * @brief Return the number of support points in the shared grid.
+   *
+   * @return Number of grid support points.
    */
   std::size_t point_count() const { return grid_.point_count(); }
 
   /**
    * @brief Return the raw interleaved field payload.
+   *
+   * @return Point-major interleaved payload.
    */
   const std::vector<Value>& interleaved_values() const
   {
@@ -78,6 +88,9 @@ public:
 
   /**
    * @brief Resolve a field name to its local field index.
+   *
+   * @param name Field name to look up.
+   * @return Zero-based field index in storage order.
    */
   std::size_t field_index(const std::string& name) const
   {
@@ -92,6 +105,11 @@ public:
   /**
    * @brief Evaluate all fields using a previously prepared interpolation
    * stencil.
+   *
+   * @param prepared Prepared query to reuse across fields.
+   * @return Interpolated field values in storage order.
+   * @see Grid::prepare
+   * @see evaluate_all(const std::array<double, Dim>&)
    */
   std::vector<Value> evaluate_all(const PreparedQuery<Dim>& prepared) const
   {
@@ -103,6 +121,10 @@ public:
   /**
    * @brief Evaluate all fields using a previously prepared interpolation
    * stencil into caller-provided storage.
+   *
+   * @param prepared Prepared query to reuse across fields.
+   * @param results Output buffer with space for `field_count()` values.
+   * @see evaluate_all(const PreparedQuery<Dim>&)
    */
   void evaluate_all_into(const PreparedQuery<Dim>& prepared,
                          Value* results) const
@@ -121,6 +143,10 @@ public:
 
   /**
    * @brief Evaluate all fields directly from query coordinates.
+   *
+   * @param coordinates Query coordinates in grid axis order.
+   * @return Interpolated field values in storage order.
+   * @see evaluate_all(const PreparedQuery<Dim>&)
    */
   std::vector<Value> evaluate_all(
     const std::array<double, Dim>& coordinates) const
@@ -131,6 +157,10 @@ public:
   /**
    * @brief Evaluate all fields directly from query coordinates into
    * caller-provided storage.
+   *
+   * @param coordinates Query coordinates in grid axis order.
+   * @param results Output buffer with space for `field_count()` values.
+   * @see evaluate_all_into(const PreparedQuery<Dim>&, Value*)
    */
   void evaluate_all_into(const std::array<double, Dim>& coordinates,
                          Value* results) const

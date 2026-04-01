@@ -7,3 +7,8 @@
 #include "ndtbl/io.hpp"
 #include "ndtbl/metadata.hpp"
 #include "ndtbl/types.hpp"
+
+/**
+ * @file
+ * @brief Umbrella include for the complete public ndtbl API.
+ */

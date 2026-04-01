@@ -30,6 +30,7 @@ author = "Thomas Isensee"
 # ones.
 extensions = [
     "breathe",
+    "myst_parser",
     "sphinx_rtd_theme",
 ]
 

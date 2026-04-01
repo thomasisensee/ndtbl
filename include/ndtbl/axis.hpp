@@ -32,6 +32,11 @@ public:
    *
    * For a single-point axis, `max_value` is ignored and the lone coordinate is
    * stored as `min_value`.
+   *
+   * @param min_value Smallest coordinate on the axis.
+   * @param max_value Largest coordinate on the axis for multi-point axes.
+   * @param size Number of support points on the axis.
+   * @return Uniform axis descriptor.
    */
   static Axis uniform(double min_value, double max_value, std::size_t size)
   {
@@ -58,6 +63,9 @@ public:
    * @brief Construct an axis from explicit coordinates.
    *
    * The coordinates must be strictly increasing.
+   *
+   * @param coordinates Explicit coordinate list in ascending order.
+   * @return Axis descriptor using explicit coordinates.
    */
   static Axis from_coordinates(const std::vector<double>& coordinates)
   {
@@ -84,21 +92,29 @@ public:
 
   /**
    * @brief Return the representation used by this axis.
+   *
+   * @return Axis storage representation.
    */
   axis_kind kind() const { return kind_; }
 
   /**
    * @brief Return the number of support points on the axis.
+   *
+   * @return Number of support points.
    */
   std::size_t size() const { return size_; }
 
   /**
    * @brief Return the smallest coordinate value on the axis.
+   *
+   * @return Smallest coordinate value.
    */
   double min() const { return min_; }
 
   /**
    * @brief Return the largest coordinate value on the axis.
+   *
+   * @return Largest coordinate value.
    */
   double max() const { return max_; }
 
@@ -107,6 +123,9 @@ public:
    *
    * Uniform axes generate the coordinate analytically. Explicit axes return the
    * stored value.
+   *
+   * @param index Zero-based coordinate index.
+   * @return Coordinate value at the requested index.
    */
   double coordinate(std::size_t index) const
   {
@@ -131,6 +150,8 @@ public:
    * @brief Return the full coordinate list for this axis.
    *
    * For uniform axes this materializes the coordinates on demand.
+   *
+   * @return Full coordinate list in ascending order.
    */
   std::vector<double> coordinates() const
   {
@@ -147,6 +168,9 @@ public:
 
   /**
    * @brief Check whether two axes describe the same grid support.
+   *
+   * @param other Axis to compare against.
+   * @return `true` if both axes represent the same support points.
    */
   bool equivalent(const Axis& other) const
   {
@@ -166,6 +190,9 @@ public:
    *
    * Values outside the axis range are clamped to the nearest interval endpoint.
    * The returned pair is `(lower_index, upper_weight)`.
+   *
+   * @param value Coordinate value to bracket.
+   * @return Pair of lower interval index and upper interpolation weight.
    */
   std::pair<std::size_t, double> bracket(double value) const
   {

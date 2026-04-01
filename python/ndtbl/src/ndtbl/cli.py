@@ -15,6 +15,13 @@ from .model import ExplicitAxis, FieldGroup, GroupMetadata, UniformAxis
 DEFAULT_MAX_SIZE_MIB = 128.0
 
 
+class _HelpOnlyOption(click.Option):
+    """Show an option in Click help without registering it for parsing."""
+
+    def add_to_parser(self, parser, ctx) -> None:  # type: ignore[override]
+        return None
+
+
 def _format_axis(axis: UniformAxis | ExplicitAxis, axis_index: int) -> str:
     if isinstance(axis, UniformAxis):
         return (
@@ -202,6 +209,17 @@ def inspect_command(file: Path, samples: int) -> None:
     help="Define one uniform axis. Repeat for each axis in storage order.",
 )
 @click.option(
+    "--field-linear",
+    "-f",
+    cls=_HelpOnlyOption,
+    expose_value=False,
+    metavar="NAME OFFSET C0 [C1 ...]",
+    help=(
+        "Define one linear field. Provide one coefficient per axis in axis "
+        "order."
+    ),
+)
+@click.option(
     "--dtype",
     "-t",
     type=click.Choice(("float32", "float64"), case_sensitive=True),
@@ -224,13 +242,7 @@ def generate_command(
     dtype: str,
     max_size_mib: float,
 ) -> None:
-    """Generate a simple .ndtbl file with predefined linear fields.
-
-    Field syntax:
-      --field-linear NAME OFFSET C0 [C1 ...]
-
-    Provide one coefficient per axis in axis order.
-    """
+    """Generate a simple .ndtbl file with predefined linear fields."""
 
     axes = _parse_axes(axis_specs)
     extra_tokens = tuple(ctx.args)

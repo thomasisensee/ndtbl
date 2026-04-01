@@ -49,8 +49,9 @@ def test_generate_help_mentions_field_syntax(runner) -> None:
 
     assert result.exit_code == 0
     assert "Usage: main generate [OPTIONS] [OUTPUT]" in result.output
-    assert "--field-linear NAME OFFSET C0 [C1 ...]" in result.output
+    assert "-f, --field-linear NAME OFFSET C0 [C1 ...]" in result.output
     assert "--max-size-mib" in result.output
+    assert "Field syntax:" not in result.output
 
 
 def test_generate_writes_expected_file_with_long_options(

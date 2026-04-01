@@ -114,6 +114,7 @@ jobs:
         fail_ci_if_error: true
         files: ${{github.workspace}}/build/coverage.info
         flags: cpp
+        plugins: noop
         token: ${{ secrets.CODECOV_TOKEN }}
         slug: thomasisensee/ndtbl
         verbose: true

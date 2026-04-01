@@ -109,3 +109,6 @@ venv.bak/
 
 # Rope project settings
 .ropeproject
+
+# ndtbl binary files
+*.ndtbl

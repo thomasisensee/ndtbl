@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 name = "ndtbl"
 description = "This package provides a pure-Python way to create, inspect, and validate .ndtbl files without depending on the C++ binaries."
 readme = "README.md"
-maintainers = [
+authors = [
     { name = "Thomas Isensee", email = "thomas.isensee@iwr.uni-heidelberg.de" },
 ]
 version = "0.0.1"

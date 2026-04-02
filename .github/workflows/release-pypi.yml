@@ -33,6 +33,7 @@ jobs:
 
       - name: Verify release tag matches package version
         if: ${{ github.event_name == 'push' }}
+        working-directory: ${{ github.workspace }}/python/ndtbl/
         run: |
           python - <<'PY'
           import os
@@ -54,29 +55,18 @@ jobs:
           PY
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8
-
-      - name: Install build and test dependencies
-        run: |
-          python -m uv pip install --upgrade pip twine
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57
 
       - name: Build source and wheel distributions
+        working-directory: ${{ github.workspace }}/python/ndtbl/
         run: |
-          python -m uv build
-
-      - name: Check built distributions
-        run: |
-          python -m twine check dist/*
-
-      - name: Install package from built wheel
-        run: |
-          python -m uv pip install --force-reinstall dist/*.whl
+          uv build
 
       - name: Upload built distributions
         uses: actions/upload-artifact@v7
         with:
           name: python-package-distributions
-          path: dist/*
+          path: python/ndtbl/dist/*
           if-no-files-found: error
 
   publish-testpypi:
@@ -88,7 +78,6 @@ jobs:
       id-token: write
     environment:
       name: testpypi
-      url: https://test.pypi.org/project/ndtbl/
 
     steps:
       - name: Download built distributions
@@ -97,10 +86,12 @@ jobs:
           name: python-package-distributions
           path: dist/
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57
+
       - name: Publish distributions to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
+        run: |
+          uv publish --index testpypi
 
   publish-pypi:
     name: Publish to PyPI
@@ -111,7 +102,6 @@ jobs:
       id-token: write
     environment:
       name: pypi
-      url: https://pypi.org/project/ndtbl/
 
     steps:
       - name: Download built distributions
@@ -120,5 +110,9 @@ jobs:
           name: python-package-distributions
           path: dist/
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57
+
       - name: Publish distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        run: |
+          uv publish --index pypi

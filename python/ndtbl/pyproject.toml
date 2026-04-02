@@ -71,3 +71,15 @@ select = [
     "F",
     "I",
 ]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/ndtbl/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/ndtbl/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true

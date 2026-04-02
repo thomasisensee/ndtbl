@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build](https://github.com/thomasisensee/ndtbl/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasisensee/ndtbl/actions)
 [![Documentation Status](https://readthedocs.org/projects/ndtbl/badge/)](https://ndtbl.readthedocs.io/)
-[![codecov](https://codecov.io/gh/thomasisensee/ndtbl/branch/main/graph/badge.svg)](https://codecov.io/gh/thomasisensee/ndtbl)
+[![codecov](https://codecov.io/gh/thomasisensee/ndtbl/graph/badge.svg?flag=cpp&token=5N4GQ0YP7I)](https://codecov.io/gh/thomasisensee/ndtbl)
 
 `ndtbl` is an n-dimensional table format and toolkit.
 

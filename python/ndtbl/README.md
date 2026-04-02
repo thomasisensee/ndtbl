@@ -1,7 +1,7 @@
 # ndtbl
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![codecov](https://codecov.io/gh/thomasisensee/ndtbl/branch/main/graph/badge.svg)](https://codecov.io/gh/thomasisensee/ndtbl)
+[![codecov](https://codecov.io/gh/thomasisensee/ndtbl/graph/badge.svg?flag=python&token=5N4GQ0YP7I)](https://codecov.io/gh/thomasisensee/ndtbl)
 [![PyPI](https://img.shields.io/pypi/v/ndtbl)](https://pypi.org/project/ndtbl)
 ![Python](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13%20|%203.14-blue)
 

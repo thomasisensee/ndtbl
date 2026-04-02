@@ -11,11 +11,16 @@ include(GNUInstallDirs)
 
 # Define build options
 option(ndtbl_BUILD_TESTING "Enable building of tests" OFF)
+option(ndtbl_ENABLE_MMAP "Enable POSIX mmap-backed ndtbl payload reads" OFF)
 
 if(PROJECT_IS_TOP_LEVEL)
   option(ndtbl_BUILD_DOCS "Enable building of documentation" ON)
 else()
   option(ndtbl_BUILD_DOCS "Enable building of documentation" OFF)
+endif()
+
+if(ndtbl_ENABLE_MMAP AND NOT UNIX)
+  message(FATAL_ERROR "ndtbl_ENABLE_MMAP requires a POSIX platform")
 endif()
 
 # Add an interface target for the header-only library
@@ -33,9 +38,16 @@ target_sources(ndtbl
       include/ndtbl/field_group.hpp
       include/ndtbl/any_field_group.hpp
       include/ndtbl/metadata.hpp
+      include/ndtbl/payload.hpp
       include/ndtbl/io.hpp
       include/ndtbl/ndtbl.hpp
       include/ndtbl/detail/binary_io.hpp
+      include/ndtbl/detail/mapped_payload.hpp
+)
+
+target_compile_definitions(ndtbl
+  INTERFACE
+    NDTBL_ENABLE_MMAP=$<BOOL:${ndtbl_ENABLE_MMAP}>
 )
 
 # Request a minimum C++ standard for this target

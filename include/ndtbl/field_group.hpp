@@ -1,9 +1,12 @@
 #pragma once
 
 #include "ndtbl/grid.hpp"
+#include "ndtbl/payload.hpp"
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -14,8 +17,10 @@ namespace ndtbl {
  * @brief One grid plus one or more named fields stored in interleaved flat
  * memory.
  *
- * The storage layout is point-major:
+ * The storage layout is point-major in row-major grid order:
  * `point0.field0, point0.field1, ..., point1.field0, ...`
+ * where the last grid axis varies fastest before stepping to the next field
+ * tuple.
  * so that one prepared interpolation query can accumulate all fields together.
  */
 template<class Value, std::size_t Dim>
@@ -32,20 +37,49 @@ public:
   FieldGroup(const Grid<Dim>& grid,
              const std::vector<std::string>& field_names,
              const std::vector<Value>& interleaved_values)
+    : FieldGroup(grid, field_names, std::vector<Value>(interleaved_values))
+  {
+  }
+
+  /**
+   * @brief Construct a field group from owned payload storage.
+   *
+   * @param grid Shared interpolation grid.
+   * @param field_names Logical names of the stored fields.
+   * @param interleaved_values Flat point-major payload whose ownership is moved
+   *                           into the group.
+   */
+  FieldGroup(const Grid<Dim>& grid,
+             const std::vector<std::string>& field_names,
+             std::vector<Value>&& interleaved_values)
+    : grid_(grid)
+    , field_names_(field_names)
+  {
+    adopt_owned_payload(std::move(interleaved_values));
+    validate_payload_shape();
+  }
+
+  /**
+   * @brief Construct a field group from externally managed payload storage.
+   *
+   * @param grid Shared interpolation grid.
+   * @param field_names Logical names of the stored fields.
+   * @param interleaved_values View over a contiguous point-major payload.
+   * @param payload_owner Shared owner keeping the viewed payload alive.
+   */
+  FieldGroup(const Grid<Dim>& grid,
+             const std::vector<std::string>& field_names,
+             const PayloadView<Value>& interleaved_values,
+             std::shared_ptr<const std::uint8_t> payload_owner)
     : grid_(grid)
     , field_names_(field_names)
     , interleaved_values_(interleaved_values)
+    , payload_owner_(std::move(payload_owner))
   {
-    if (field_names_.empty()) {
-      throw std::invalid_argument(
-        "field group must contain at least one field");
+    if (interleaved_values_.size() != 0 && !payload_owner_) {
+      throw std::invalid_argument("field group payload owner is empty");
     }
-
-    const std::size_t expected_size = grid_.point_count() * field_names_.size();
-    if (interleaved_values_.size() != expected_size) {
-      throw std::invalid_argument(
-        "field payload size does not match grid and field count");
-    }
+    validate_payload_shape();
   }
 
   /**
@@ -77,14 +111,11 @@ public:
   std::size_t point_count() const { return grid_.point_count(); }
 
   /**
-   * @brief Return the raw interleaved field payload.
+   * @brief Return a read-only view of the raw interleaved field payload.
    *
-   * @return Point-major interleaved payload.
+   * @return Point-major interleaved payload view.
    */
-  const std::vector<Value>& interleaved_values() const
-  {
-    return interleaved_values_;
-  }
+  PayloadView<Value> interleaved_values() const { return interleaved_values_; }
 
   /**
    * @brief Resolve a field name to its local field index.
@@ -169,9 +200,36 @@ public:
   }
 
 private:
+  void adopt_owned_payload(std::vector<Value>&& interleaved_values)
+  {
+    const std::shared_ptr<std::vector<Value>> storage =
+      std::make_shared<std::vector<Value>>(std::move(interleaved_values));
+    const std::uint8_t* const data =
+      storage->empty() ? nullptr
+                       : reinterpret_cast<const std::uint8_t*>(storage->data());
+    interleaved_values_ = PayloadView<Value>(data, storage->size());
+    payload_owner_ = std::shared_ptr<const std::uint8_t>(storage, data);
+  }
+
+  void validate_payload_shape() const
+  {
+    if (field_names_.empty()) {
+      throw std::invalid_argument(
+        "field group must contain at least one field");
+    }
+
+    const std::size_t expected_size = grid_.point_count() * field_names_.size();
+    if (interleaved_values_.size() != expected_size) {
+      throw std::invalid_argument(
+        "field payload size does not match grid and field count");
+    }
+  }
+
+private:
   Grid<Dim> grid_;
   std::vector<std::string> field_names_;
-  std::vector<Value> interleaved_values_;
+  PayloadView<Value> interleaved_values_;
+  std::shared_ptr<const std::uint8_t> payload_owner_;
 };
 
 } // namespace ndtbl

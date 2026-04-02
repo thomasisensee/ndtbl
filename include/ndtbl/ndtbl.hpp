@@ -6,6 +6,7 @@
 #include "ndtbl/grid.hpp"
 #include "ndtbl/io.hpp"
 #include "ndtbl/metadata.hpp"
+#include "ndtbl/payload.hpp"
 #include "ndtbl/types.hpp"
 
 /**

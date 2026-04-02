@@ -2,6 +2,7 @@
 
 #include "ndtbl/any_field_group.hpp"
 #include "ndtbl/detail/binary_io.hpp"
+#include "ndtbl/detail/mapped_payload.hpp"
 
 #include <fstream>
 #include <stdexcept>
@@ -30,12 +31,14 @@ write_group_stream(std::ostream& os, const FieldGroup<Value, Dim>& group)
  * @brief Write a raw ndtbl payload with explicit metadata to a binary stream.
  *
  * This overload is useful when the caller already has metadata and an
- * interleaved point-major payload, but not a typed `FieldGroup`.
+ * interleaved point-major payload in row-major axis order, but not a typed
+ * `FieldGroup`.
  *
  * @tparam Value Scalar payload type stored in the payload vector.
  * @param os Destination stream in binary mode.
  * @param metadata Group metadata to encode into the file header.
- * @param interleaved_values Point-major field payload to serialize.
+ * @param interleaved_values Point-major field payload to serialize in row-major
+ *                           axis order.
  * @see write_group_stream(std::ostream&, const FieldGroup<Value, Dim>&)
  */
 template<class Value>
@@ -73,7 +76,8 @@ write_group(const std::string& path, const FieldGroup<Value, Dim>& group)
  * @tparam Value Scalar payload type stored in the payload vector.
  * @param path Output file path.
  * @param metadata Group metadata to encode into the file header.
- * @param interleaved_values Point-major field payload to serialize.
+ * @param interleaved_values Point-major field payload to serialize in row-major
+ *                           axis order.
  * @see write_group_stream(std::ostream&, const GroupMetadata&,
  *                         const std::vector<Value>&)
  */
@@ -151,7 +155,8 @@ read_group(const std::string& path)
     throw std::runtime_error("failed to open ndtbl input file: " + path);
   }
 
-  const GroupMetadata metadata = detail::read_group_metadata_impl(is);
+  const detail::parsed_group_layout layout = detail::read_group_layout_impl(is);
+  const GroupMetadata& metadata = layout.metadata;
   if (metadata.dimension != Dim) {
     throw std::runtime_error(
       "ndtbl file dimension does not match typed loader");
@@ -162,17 +167,39 @@ read_group(const std::string& path)
   const std::size_t value_count = metadata.point_count * metadata.field_count;
 
   if (metadata.value_type == scalar_type::float32) {
+#if NDTBL_ENABLE_MMAP
+    const std::shared_ptr<const std::uint8_t> payload_owner =
+      detail::map_payload_bytes(
+        path, layout.payload_offset, layout.payload_size);
+    return LoadedFieldGroup<Dim>(FieldGroup<float, Dim>(
+      grid,
+      metadata.field_names,
+      PayloadView<float>(payload_owner.get(), layout.value_count),
+      payload_owner));
+#else
     const std::vector<float> values =
       detail::read_payload<float>(is, value_count);
     return LoadedFieldGroup<Dim>(
-      FieldGroup<float, Dim>(grid, metadata.field_names, values));
+      FieldGroup<float, Dim>(grid, metadata.field_names, std::move(values)));
+#endif
   }
 
   if (metadata.value_type == scalar_type::float64) {
+#if NDTBL_ENABLE_MMAP
+    const std::shared_ptr<const std::uint8_t> payload_owner =
+      detail::map_payload_bytes(
+        path, layout.payload_offset, layout.payload_size);
+    return LoadedFieldGroup<Dim>(FieldGroup<double, Dim>(
+      grid,
+      metadata.field_names,
+      PayloadView<double>(payload_owner.get(), layout.value_count),
+      payload_owner));
+#else
     const std::vector<double> values =
       detail::read_payload<double>(is, value_count);
     return LoadedFieldGroup<Dim>(
-      FieldGroup<double, Dim>(grid, metadata.field_names, values));
+      FieldGroup<double, Dim>(grid, metadata.field_names, std::move(values)));
+#endif
   }
 
   throw std::runtime_error("unsupported ndtbl scalar type");

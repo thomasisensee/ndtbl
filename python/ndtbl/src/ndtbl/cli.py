@@ -277,9 +277,9 @@ def main() -> None:
 def inspect_command(file: Path, samples: int) -> None:
     """Print metadata and sample payload values from an .ndtbl file.
 
-    Args:
-        file: Path to the input ``.ndtbl`` file.
-        samples: Maximum number of flattened sample points to print.
+    FILE is the input ``.ndtbl`` path.
+
+    Use ``--samples`` to limit how many flattened sample points are shown.
     """
 
     try:
@@ -306,10 +306,10 @@ def query_command(
 ) -> None:
     """Print field values at one point addressed by zero-based indices.
 
-    Args:
-        file: Path to the input ``.ndtbl`` file.
-        indices: Zero-based point indices in axis order.
-        metadata: Whether to print metadata before field values.
+    FILE is the input ``.ndtbl`` path.
+
+    INDICES are zero-based point indices in axis order. Use ``--metadata`` to
+    print the table summary before the queried values.
     """
 
     try:
@@ -379,12 +379,11 @@ def generate_command(
 ) -> None:
     """Generate a simple ``.ndtbl`` file with predefined linear fields.
 
-    Args:
-        ctx: Click context used to access extra field tokens.
-        output: Optional output path if provided before extra tokens.
-        axis_specs: Uniform axis definitions collected from ``--axis``.
-        dtype: Requested output dtype name.
-        max_size_mib: Safety limit for the estimated output file size.
+    OUTPUT is optional before the extra field tokens and may also be given at
+    the end of the command.
+
+    Repeat ``--axis MIN MAX SIZE`` for each axis and ``--field-linear NAME
+    OFFSET C0 [C1 ...]`` for each generated field.
     """
 
     axes = _parse_axes(axis_specs)

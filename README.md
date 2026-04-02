@@ -1,9 +1,9 @@
 # ndtbl
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Build](https://github.com/thomasisensee/ndtbl/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasisensee/ndtbl/actions)
 [![Documentation Status](https://readthedocs.org/projects/ndtbl/badge/)](https://ndtbl.readthedocs.io/)
-[![codecov](https://codecov.io/gh/thomasisensee/ndtbl/branch/main/graph/badge.svg)](https://codecov.io/gh/thomasisensee/ndtbl)
+[![codecov](https://codecov.io/gh/thomasisensee/ndtbl/graph/badge.svg?flag=cpp&token=5N4GQ0YP7I)](https://codecov.io/gh/thomasisensee/ndtbl)
 
 `ndtbl` is an n-dimensional table format and toolkit.
 
@@ -15,6 +15,9 @@ This repository currently contains two user-facing parts:
 It also contains a separate pure-Python package in `python/ndtbl/` for reading,
 writing, inspecting, querying, and generating `.ndtbl` files without the C++
 toolchain.
+
+The C++ reader can also be built with optional POSIX `mmap` support so payloads
+can stay file-backed instead of always being copied into heap memory.
 
 ## 🗂️ Layout
 
@@ -70,11 +73,24 @@ Relevant CMake options:
 
 - `ndtbl_BUILD_TESTING`: build the C++ test suite, default `OFF`
 - `ndtbl_BUILD_DOCS`: build the documentation, default `ON` for top-level builds
+- `ndtbl_ENABLE_MMAP`: enable POSIX-only `mmap`-backed payload reads, default `OFF`
+
+When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_group()` reads payload data
+into owned heap storage. When `ndtbl_ENABLE_MMAP=ON`, supported POSIX builds
+use read-only memory mapping instead, which can reduce heap usage for large
+tables.
 
 If you want to install the C++ headers and CMake package metadata:
 
 ```bash
 cmake --install build --prefix /desired/prefix
+```
+
+To enable optional `mmap`-backed reads on supported POSIX platforms:
+
+```bash
+cmake -B build -Dndtbl_ENABLE_MMAP=ON
+cmake --build build
 ```
 
 ## ⚙️ C++ Tool Workflow
@@ -99,6 +115,9 @@ Inspect the generated file:
 
 These commands use the C++ executables built in the previous step. They are not
 available before `cmake --build build`.
+
+When `ndtbl_ENABLE_MMAP=ON`, the C++ `read_group()` path uses read-only memory
+mapping on supported POSIX platforms.
 
 ## 🐍 Python Package
 

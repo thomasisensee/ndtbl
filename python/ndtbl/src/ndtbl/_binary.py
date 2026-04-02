@@ -1,4 +1,5 @@
 import struct
+from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
@@ -13,7 +14,6 @@ from .model import (
 )
 
 MAGIC = b"NDTBL1\0\0"
-ENDIAN_MARKER = 0x01020304
 VERSION = 1
 
 AXIS_KIND_UNIFORM = 1
@@ -22,12 +22,11 @@ AXIS_KIND_EXPLICIT = 2
 SCALAR_FLOAT32 = 1
 SCALAR_FLOAT64 = 2
 
-NATIVE_PREFIX = "="
-UINT8 = struct.Struct(f"{NATIVE_PREFIX}B")
-UINT16 = struct.Struct(f"{NATIVE_PREFIX}H")
-UINT32 = struct.Struct(f"{NATIVE_PREFIX}I")
-UINT64 = struct.Struct(f"{NATIVE_PREFIX}Q")
-DOUBLE = struct.Struct(f"{NATIVE_PREFIX}d")
+LITTLE_ENDIAN_PREFIX = "<"
+UINT8 = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}B")
+UINT16 = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}H")
+UINT64 = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}Q")
+DOUBLE = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}d")
 
 DTYPE_TO_TAG = {
     np.dtype(np.float32): SCALAR_FLOAT32,
@@ -39,17 +38,16 @@ TAG_TO_DTYPE = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class ParsedLayout:
+    """Parsed metadata plus payload layout information."""
+
+    metadata: GroupMetadata
+    payload_offset: int
+
+
 def _read_exact(stream: BinaryIO, size: int) -> bytes:
-    """Read exactly ``size`` bytes from a binary stream.
-
-    Args:
-        stream: Open binary stream positioned at the next payload bytes.
-        size: Number of bytes to read.
-
-    Returns:
-        The requested byte sequence.
-    """
-
+    """Read exactly ``size`` bytes from a binary stream."""
     data = stream.read(size)
     if len(data) != size:
         raise NdtblFormatError("unexpected end of ndtbl file")
@@ -66,11 +64,6 @@ def _read_uint16(stream: BinaryIO) -> int:
     return UINT16.unpack(_read_exact(stream, UINT16.size))[0]
 
 
-def _read_uint32(stream: BinaryIO) -> int:
-    """Read one unsigned 32-bit integer from a stream."""
-    return UINT32.unpack(_read_exact(stream, UINT32.size))[0]
-
-
 def _read_uint64(stream: BinaryIO) -> int:
     """Read one unsigned 64-bit integer from a stream."""
     return UINT64.unpack(_read_exact(stream, UINT64.size))[0]
@@ -82,101 +75,50 @@ def _read_double(stream: BinaryIO) -> float:
 
 
 def _write_uint8(stream: BinaryIO, value: int) -> None:
-    """Write one unsigned 8-bit integer to a stream.
-
-    Args:
-        stream: Open binary stream positioned at the write offset.
-        value: Integer value to encode.
-    """
-
+    """Write one unsigned 8-bit integer to a stream."""
     stream.write(UINT8.pack(value))
 
 
 def _write_uint16(stream: BinaryIO, value: int) -> None:
-    """Write one unsigned 16-bit integer to a stream.
-
-    Args:
-        stream: Open binary stream positioned at the write offset.
-        value: Integer value to encode.
-    """
-
+    """Write one unsigned 16-bit integer to a stream."""
     stream.write(UINT16.pack(value))
 
 
-def _write_uint32(stream: BinaryIO, value: int) -> None:
-    """Write one unsigned 32-bit integer to a stream.
-
-    Args:
-        stream: Open binary stream positioned at the write offset.
-        value: Integer value to encode.
-    """
-
-    stream.write(UINT32.pack(value))
-
-
 def _write_uint64(stream: BinaryIO, value: int) -> None:
-    """Write one unsigned 64-bit integer to a stream.
-
-    Args:
-        stream: Open binary stream positioned at the write offset.
-        value: Integer value to encode.
-    """
-
+    """Write one unsigned 64-bit integer to a stream."""
     stream.write(UINT64.pack(value))
 
 
 def _write_double(stream: BinaryIO, value: float) -> None:
-    """Write one double-precision float to a stream.
-
-    Args:
-        stream: Open binary stream positioned at the write offset.
-        value: Floating-point value to encode.
-    """
-
+    """Write one little-endian IEEE-754 double to a stream."""
     stream.write(DOUBLE.pack(value))
 
 
+def _require_zero(value: int, what: str) -> None:
+    """Reject reserved fields that are not zero."""
+    if value != 0:
+        raise NdtblFormatError(f"ndtbl {what} must be zero")
+
+
 def _read_string(stream: BinaryIO) -> str:
-    """Read a length-prefixed UTF-8 string from a stream.
-
-    Args:
-        stream: Open binary stream positioned at the string header.
-
-    Returns:
-        The decoded string value.
-    """
-
+    """Read a length-prefixed UTF-8 string from a stream."""
     size = _read_uint64(stream)
     data = _read_exact(stream, size)
     return data.decode("utf-8")
 
 
 def _write_string(stream: BinaryIO, value: str) -> None:
-    """Write a length-prefixed UTF-8 string to a stream.
-
-    Args:
-        stream: Open binary stream positioned at the string header.
-        value: String value to encode.
-    """
-
+    """Write a length-prefixed UTF-8 string to a stream."""
     encoded = value.encode("utf-8")
     _write_uint64(stream, len(encoded))
     stream.write(encoded)
 
 
 def _read_axis(stream: BinaryIO) -> UniformAxis | ExplicitAxis:
-    """Read one serialized axis definition from a stream.
-
-    Args:
-        stream: Open binary stream positioned at an axis header.
-
-    Returns:
-        The decoded axis object.
-    """
-
+    """Read one serialized axis definition from a stream."""
     axis_tag = _read_uint8(stream)
-    _read_uint8(stream)
-    _read_uint16(stream)
+    _require_zero(_read_uint8(stream), "axis reserved byte")
+    _require_zero(_read_uint16(stream), "axis reserved field")
     size = _read_uint64(stream)
 
     if axis_tag == AXIS_KIND_UNIFORM:
@@ -194,13 +136,7 @@ def _read_axis(stream: BinaryIO) -> UniformAxis | ExplicitAxis:
 
 
 def _write_axis(stream: BinaryIO, axis: UniformAxis | ExplicitAxis) -> None:
-    """Write one axis definition to a stream.
-
-    Args:
-        stream: Open binary stream positioned at an axis header.
-        axis: Axis object to encode.
-    """
-
+    """Write one axis definition to a stream."""
     if isinstance(axis, UniformAxis):
         _write_uint8(stream, AXIS_KIND_UNIFORM)
         _write_uint8(stream, 0)
@@ -218,30 +154,38 @@ def _write_axis(stream: BinaryIO, axis: UniformAxis | ExplicitAxis) -> None:
         _write_double(stream, coordinate)
 
 
-def read_metadata_from_stream(stream: BinaryIO) -> GroupMetadata:
-    """Read ndtbl metadata from an already opened stream.
+def _metadata_size(metadata: GroupMetadata) -> int:
+    """Return the byte offset where the payload starts."""
+    total = (
+        len(MAGIC) + UINT8.size + UINT8.size + UINT16.size + UINT64.size * 4
+    )
 
-    Args:
-        stream: Open binary stream positioned at the file start.
+    for axis in metadata.axes:
+        total += UINT8.size + UINT8.size + UINT16.size + UINT64.size
+        if isinstance(axis, UniformAxis):
+            total += DOUBLE.size * 2
+        else:
+            total += axis.size * DOUBLE.size
 
-    Returns:
-        Parsed metadata without loading the numeric payload.
-    """
+    for field_name in metadata.field_names:
+        total += UINT64.size + len(field_name.encode("utf-8"))
 
+    return total
+
+
+def _read_layout_from_stream(stream: BinaryIO) -> ParsedLayout:
+    """Read ndtbl metadata and validate the encoded payload offset."""
     magic = _read_exact(stream, len(MAGIC))
     if magic != MAGIC:
         raise NdtblFormatError("invalid ndtbl magic header")
-
-    marker = _read_uint32(stream)
-    if marker != ENDIAN_MARKER:
-        raise NdtblFormatError("unsupported ndtbl endianness")
 
     version = _read_uint8(stream)
     if version != VERSION:
         raise NdtblFormatError(f"unsupported ndtbl version: {version}")
 
     scalar_tag = _read_uint8(stream)
-    _read_uint16(stream)
+    _require_zero(_read_uint16(stream), "header reserved field")
+    payload_offset = _read_uint64(stream)
 
     try:
         dtype = TAG_TO_DTYPE[scalar_tag]
@@ -260,24 +204,31 @@ def read_metadata_from_stream(stream: BinaryIO) -> GroupMetadata:
     metadata = GroupMetadata(axes=axes, field_names=field_names, dtype=dtype)
     if metadata.point_count != point_count:
         raise NdtblFormatError("ndtbl point count does not match axis extents")
-    return metadata
+
+    actual_offset = stream.tell()
+    if actual_offset != payload_offset:
+        raise NdtblFormatError("ndtbl payload offset does not match metadata")
+
+    return ParsedLayout(metadata=metadata, payload_offset=payload_offset)
+
+
+def read_metadata_from_stream(stream: BinaryIO) -> GroupMetadata:
+    """Read ndtbl metadata from an already opened stream."""
+    return _read_layout_from_stream(stream).metadata
 
 
 def read_group_from_stream(stream: BinaryIO) -> FieldGroup:
-    """Read an entire ndtbl file from an already opened stream.
-
-    Args:
-        stream: Open binary stream positioned at the file start.
-
-    Returns:
-        Parsed field group including payload values.
-    """
-
-    metadata = read_metadata_from_stream(stream)
+    """Read an entire ndtbl file from an already opened stream."""
+    layout = _read_layout_from_stream(stream)
+    metadata = layout.metadata
     value_count = metadata.point_count * metadata.field_count
     payload_size = value_count * metadata.dtype.itemsize
     payload = _read_exact(stream, payload_size)
-    values = np.frombuffer(payload, dtype=metadata.dtype).copy()
+
+    wire_dtype = metadata.dtype.newbyteorder("<")
+    values = np.frombuffer(payload, dtype=wire_dtype).astype(
+        metadata.dtype, copy=False
+    )
     shaped = values.reshape(
         (*metadata.axis_sizes, metadata.field_count), order="C"
     )
@@ -289,13 +240,7 @@ def read_group_from_stream(stream: BinaryIO) -> FieldGroup:
 
 
 def write_group_to_stream(stream: BinaryIO, group: FieldGroup) -> None:
-    """Write a field group to an already opened stream.
-
-    Args:
-        stream: Open binary stream positioned at the file start.
-        group: Field group to serialize.
-    """
-
+    """Write a field group to an already opened stream."""
     metadata = group.metadata()
 
     try:
@@ -306,10 +251,10 @@ def write_group_to_stream(stream: BinaryIO, group: FieldGroup) -> None:
         ) from error
 
     stream.write(MAGIC)
-    _write_uint32(stream, ENDIAN_MARKER)
     _write_uint8(stream, VERSION)
     _write_uint8(stream, scalar_tag)
     _write_uint16(stream, 0)
+    _write_uint64(stream, _metadata_size(metadata))
     _write_uint64(stream, metadata.dimension)
     _write_uint64(stream, metadata.field_count)
     _write_uint64(stream, metadata.point_count)
@@ -320,30 +265,16 @@ def write_group_to_stream(stream: BinaryIO, group: FieldGroup) -> None:
     for field_name in metadata.field_names:
         _write_string(stream, field_name)
 
-    stream.write(group.values.reshape(-1, order="C").tobytes(order="C"))
+    wire_dtype = group.dtype.newbyteorder("<")
+    wire_values = group.values.astype(wire_dtype, copy=False)
+    stream.write(wire_values.reshape(-1, order="C").tobytes(order="C"))
 
 
 def open_for_read(path: str | Path) -> BinaryIO:
-    """Open an ndtbl file for binary reading.
-
-    Args:
-        path: File path to open.
-
-    Returns:
-        Binary file object opened in read mode.
-    """
-
+    """Open an ndtbl file for binary reading."""
     return Path(path).open("rb")
 
 
 def open_for_write(path: str | Path) -> BinaryIO:
-    """Open an ndtbl file for binary writing.
-
-    Args:
-        path: File path to open.
-
-    Returns:
-        Binary file object opened in write mode.
-    """
-
+    """Open an ndtbl file for binary writing."""
     return Path(path).open("wb")

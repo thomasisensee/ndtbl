@@ -17,7 +17,7 @@ writing, inspecting, querying, and generating `.ndtbl` files without the C++
 toolchain.
 
 The C++ reader can also be built with optional POSIX `mmap` support so payloads
-stay file-backed instead of always being copied into heap memory.
+can stay file-backed instead of always being copied into heap memory.
 
 ## 🗂️ Layout
 
@@ -75,6 +75,11 @@ Relevant CMake options:
 - `ndtbl_BUILD_DOCS`: build the documentation, default `ON` for top-level builds
 - `ndtbl_ENABLE_MMAP`: enable POSIX-only `mmap`-backed payload reads, default `OFF`
 
+When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_group()` reads payload data
+into owned heap storage. When `ndtbl_ENABLE_MMAP=ON`, supported POSIX builds
+use read-only memory mapping instead, which can reduce heap usage for large
+tables.
+
 If you want to install the C++ headers and CMake package metadata:
 
 ```bash
@@ -112,8 +117,7 @@ These commands use the C++ executables built in the previous step. They are not
 available before `cmake --build build`.
 
 When `ndtbl_ENABLE_MMAP=ON`, the C++ `read_group()` path uses read-only memory
-mapping by default. This is currently supported only on POSIX platforms and is
-intended to reduce peak heap usage for large tables.
+mapping on supported POSIX platforms.
 
 ## 🐍 Python Package
 

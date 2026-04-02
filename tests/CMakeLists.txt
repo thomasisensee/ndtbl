@@ -19,7 +19,8 @@ add_executable(ndtbl_tests)
 # Add the implementation file
 target_sources(ndtbl_tests
   PRIVATE
-    ndtbl_t.cpp
+    ndtbl_interpolation_t.cpp
+    ndtbl_io_t.cpp
 )
 
 # Link the test binary

@@ -6,4 +6,5 @@ ndtbl
    :caption: Contents:
 
    intro
+   format
    cppapi

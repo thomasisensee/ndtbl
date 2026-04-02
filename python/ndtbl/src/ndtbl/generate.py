@@ -5,8 +5,7 @@ import numpy as np
 from .model import FieldGroup, UniformAxis, normalize_dtype
 
 FILE_MAGIC_SIZE = 8
-ENDIAN_MARKER_SIZE = 4
-VERSION_AND_TYPE_SIZE = 4
+HEADER_PREFIX_SIZE = 1 + 1 + 2 + 8
 DIMENSION_HEADER_SIZE = 8 * 3
 AXIS_HEADER_SIZE = 8 + 8
 UNIFORM_AXIS_PAYLOAD_SIZE = 16
@@ -160,10 +159,7 @@ def estimate_generated_group_size(
     payload_bytes = point_count * field_count * normalized_dtype.itemsize
 
     metadata_bytes = (
-        FILE_MAGIC_SIZE
-        + ENDIAN_MARKER_SIZE
-        + VERSION_AND_TYPE_SIZE
-        + DIMENSION_HEADER_SIZE
+        FILE_MAGIC_SIZE + HEADER_PREFIX_SIZE + DIMENSION_HEADER_SIZE
     )
     axis_bytes = len(axes) * (AXIS_HEADER_SIZE + UNIFORM_AXIS_PAYLOAD_SIZE)
     field_name_bytes = sum(

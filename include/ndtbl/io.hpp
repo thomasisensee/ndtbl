@@ -31,12 +31,14 @@ write_group_stream(std::ostream& os, const FieldGroup<Value, Dim>& group)
  * @brief Write a raw ndtbl payload with explicit metadata to a binary stream.
  *
  * This overload is useful when the caller already has metadata and an
- * interleaved point-major payload, but not a typed `FieldGroup`.
+ * interleaved point-major payload in row-major axis order, but not a typed
+ * `FieldGroup`.
  *
  * @tparam Value Scalar payload type stored in the payload vector.
  * @param os Destination stream in binary mode.
  * @param metadata Group metadata to encode into the file header.
- * @param interleaved_values Point-major field payload to serialize.
+ * @param interleaved_values Point-major field payload to serialize in row-major
+ *                           axis order.
  * @see write_group_stream(std::ostream&, const FieldGroup<Value, Dim>&)
  */
 template<class Value>
@@ -74,7 +76,8 @@ write_group(const std::string& path, const FieldGroup<Value, Dim>& group)
  * @tparam Value Scalar payload type stored in the payload vector.
  * @param path Output file path.
  * @param metadata Group metadata to encode into the file header.
- * @param interleaved_values Point-major field payload to serialize.
+ * @param interleaved_values Point-major field payload to serialize in row-major
+ *                           axis order.
  * @see write_group_stream(std::ostream&, const GroupMetadata&,
  *                         const std::vector<Value>&)
  */

@@ -7,6 +7,7 @@ from ndtbl import (
     ExplicitAxis,
     FieldGroup,
     NdtblFormatError,
+    UniformAxis,
     read_group,
     read_metadata,
     write_group,
@@ -99,7 +100,7 @@ def test_read_metadata_rejects_unsupported_version(
     write_group(path, sample_uniform_group)
 
     data = bytearray(path.read_bytes())
-    data[12] = 99
+    data[8] = 99
     path.write_bytes(data)
 
     with pytest.raises(NdtblFormatError, match="unsupported ndtbl version"):
@@ -114,7 +115,7 @@ def test_read_metadata_rejects_unsupported_scalar_tag(
     write_group(path, sample_uniform_group)
 
     data = bytearray(path.read_bytes())
-    data[13] = 99
+    data[9] = 99
     path.write_bytes(data)
 
     with pytest.raises(
@@ -131,11 +132,81 @@ def test_read_metadata_rejects_point_count_mismatch(
     write_group(path, sample_uniform_group)
 
     data = bytearray(path.read_bytes())
-    struct.pack_into("=Q", data, 32, 999)
+    struct.pack_into("<Q", data, 36, 999)
     path.write_bytes(data)
 
     with pytest.raises(
         NdtblFormatError,
         match="ndtbl point count does not match axis extents",
+    ):
+        read_metadata(path)
+
+
+def test_write_group_uses_expected_little_endian_layout(tmp_path) -> None:
+    path = tmp_path / "exact-layout.ndtbl"
+    group = FieldGroup(
+        axes=(UniformAxis(2.0, 2.0, 1),),
+        field_names=("A",),
+        values=np.array([[1.5]], dtype=np.float32),
+    )
+
+    write_group(path, group)
+
+    expected = b"".join(
+        (
+            b"NDTBL1\0\0",
+            struct.pack("<B", 1),
+            struct.pack("<B", 1),
+            struct.pack("<H", 0),
+            struct.pack("<Q", 81),
+            struct.pack("<Q", 1),
+            struct.pack("<Q", 1),
+            struct.pack("<Q", 1),
+            struct.pack("<B", 1),
+            struct.pack("<B", 0),
+            struct.pack("<H", 0),
+            struct.pack("<Q", 1),
+            struct.pack("<d", 2.0),
+            struct.pack("<d", 2.0),
+            struct.pack("<Q", 1),
+            b"A",
+            struct.pack("<f", 1.5),
+        )
+    )
+
+    assert path.read_bytes() == expected
+    np.testing.assert_array_equal(read_group(path).values, group.values)
+
+
+def test_read_metadata_rejects_nonzero_reserved_header_field(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "bad-header-reserved.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    data = bytearray(path.read_bytes())
+    struct.pack_into("<H", data, 10, 1)
+    path.write_bytes(data)
+
+    with pytest.raises(
+        NdtblFormatError, match="ndtbl header reserved field must be zero"
+    ):
+        read_metadata(path)
+
+
+def test_read_metadata_rejects_payload_offset_mismatch(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "bad-payload-offset.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    data = bytearray(path.read_bytes())
+    struct.pack_into("<Q", data, 12, 0)
+    path.write_bytes(data)
+
+    with pytest.raises(
+        NdtblFormatError, match="ndtbl payload offset does not match metadata"
     ):
         read_metadata(path)

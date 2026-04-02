@@ -7,11 +7,13 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <istream>
 #include <limits>
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace ndtbl {
@@ -26,45 +28,117 @@ namespace detail {
 static const char file_magic[8] = { 'N', 'D', 'T', 'B', 'L', '1', '\0', '\0' };
 
 /**
- * @brief Internal endianness sentinel used to reject unsupported byte orders.
- */
-static const std::uint32_t endian_marker = 0x01020304u;
-
-/**
- * @brief Write one plain-old-data value to a binary stream.
+ * @brief Write one exact byte sequence to a binary stream.
  *
- * @tparam Pod Plain-old-data value type to serialize.
  * @param os Destination stream in binary mode.
- * @param value Value to write.
+ * @param data Source byte buffer.
+ * @param size Number of bytes to write.
  */
-template<class Pod>
 inline void
-write_pod(std::ostream& os, const Pod& value)
+write_bytes(std::ostream& os, const char* data, std::size_t size)
 {
-  os.write(reinterpret_cast<const char*>(&value), sizeof(Pod));
+  os.write(data, static_cast<std::streamsize>(size));
   if (!os.good()) {
     throw std::runtime_error("failed to write ndtbl payload");
   }
 }
 
 /**
- * @brief Read one plain-old-data value from a binary stream.
+ * @brief Read one exact byte sequence from a binary stream.
  *
- * @tparam Pod Plain-old-data value type to deserialize.
  * @param is Source stream in binary mode.
- * @return Deserialized value of type `Pod`.
+ * @param data Output byte buffer.
+ * @param size Number of bytes to read.
  */
-template<class Pod>
-inline Pod
-read_pod(std::istream& is)
+inline void
+read_bytes(std::istream& is, char* data, std::size_t size)
 {
-  Pod value;
-  is.read(reinterpret_cast<char*>(&value), sizeof(Pod));
+  is.read(data, static_cast<std::streamsize>(size));
   if (!is.good()) {
     throw std::runtime_error("failed to read ndtbl payload");
   }
+}
+
+inline bool
+host_is_little_endian()
+{
+  const std::uint16_t marker = 1u;
+  const unsigned char* bytes = reinterpret_cast<const unsigned char*>(&marker);
+  return bytes[0] == 1u;
+}
+
+template<class UInt>
+inline void
+write_uint_le(std::ostream& os, UInt value)
+{
+  static_assert(std::is_unsigned<UInt>::value,
+                "write_uint_le requires an unsigned integer type");
+
+  char bytes[sizeof(UInt)] = {};
+  for (std::size_t index = 0; index < sizeof(UInt); ++index) {
+    bytes[index] = static_cast<char>((value >> (index * 8u)) & 0xffu);
+  }
+  write_bytes(os, bytes, sizeof(bytes));
+}
+
+template<class UInt>
+inline UInt
+read_uint_le(std::istream& is)
+{
+  static_assert(std::is_unsigned<UInt>::value,
+                "read_uint_le requires an unsigned integer type");
+
+  char bytes[sizeof(UInt)] = {};
+  read_bytes(is, bytes, sizeof(bytes));
+
+  UInt value = 0;
+  for (std::size_t index = 0; index < sizeof(UInt); ++index) {
+    value |= static_cast<UInt>(static_cast<unsigned char>(bytes[index]))
+             << (index * 8u);
+  }
   return value;
 }
+
+template<class Float, class UInt>
+inline void
+write_float_le(std::ostream& os, Float value)
+{
+  static_assert(std::is_floating_point<Float>::value,
+                "write_float_le requires a floating-point type");
+  static_assert(sizeof(Float) == sizeof(UInt),
+                "write_float_le requires matching bit width");
+  static_assert(std::numeric_limits<Float>::is_iec559,
+                "ndtbl requires IEEE-754 floating-point types");
+
+  UInt bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  write_uint_le(os, bits);
+}
+
+template<class Float, class UInt>
+inline Float
+read_float_le(std::istream& is)
+{
+  static_assert(std::is_floating_point<Float>::value,
+                "read_float_le requires a floating-point type");
+  static_assert(sizeof(Float) == sizeof(UInt),
+                "read_float_le requires matching bit width");
+  static_assert(std::numeric_limits<Float>::is_iec559,
+                "ndtbl requires IEEE-754 floating-point types");
+
+  const UInt bits = read_uint_le<UInt>(is);
+  Float value;
+  std::memcpy(&value, &bits, sizeof(value));
+  return value;
+}
+
+template<class Value>
+struct payload_uint
+{
+  typedef typename std::conditional<sizeof(Value) == sizeof(std::uint32_t),
+                                    std::uint32_t,
+                                    std::uint64_t>::type type;
+};
 
 /**
  * @brief Write a length-prefixed UTF-8 string to a binary stream.
@@ -76,11 +150,8 @@ inline void
 write_string(std::ostream& os, const std::string& value)
 {
   const std::uint64_t size = static_cast<std::uint64_t>(value.size());
-  write_pod(os, size);
-  os.write(value.data(), static_cast<std::streamsize>(value.size()));
-  if (!os.good()) {
-    throw std::runtime_error("failed to write ndtbl string");
-  }
+  write_uint_le(os, size);
+  write_bytes(os, value.data(), value.size());
 }
 
 /**
@@ -92,17 +163,92 @@ write_string(std::ostream& os, const std::string& value)
 inline std::string
 read_string(std::istream& is)
 {
-  const std::uint64_t size = read_pod<std::uint64_t>(is);
+  const std::uint64_t size = read_uint_le<std::uint64_t>(is);
   if (size == 0) {
     return std::string();
   }
-
-  std::string value(size, '\0');
-  is.read(&value[0], static_cast<std::streamsize>(size));
-  if (!is.good()) {
-    throw std::runtime_error("failed to read ndtbl string");
+  if (size >
+      static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
+    throw std::runtime_error("ndtbl string length exceeds supported size");
   }
+
+  std::string value(static_cast<std::size_t>(size), '\0');
+  read_bytes(is, &value[0], static_cast<std::size_t>(size));
   return value;
+}
+
+inline std::size_t
+checked_multiply_size(std::size_t lhs, std::size_t rhs, const std::string& what)
+{
+  if (lhs != 0 && rhs > std::numeric_limits<std::size_t>::max() / lhs) {
+    throw std::runtime_error("ndtbl " + what + " exceeds supported size");
+  }
+  return lhs * rhs;
+}
+
+inline std::size_t
+checked_add_size(std::size_t lhs, std::size_t rhs, const std::string& what)
+{
+  if (rhs > std::numeric_limits<std::size_t>::max() - lhs) {
+    throw std::runtime_error("ndtbl " + what + " exceeds supported size");
+  }
+  return lhs + rhs;
+}
+
+inline std::size_t
+narrow_u64_to_size(std::uint64_t value, const std::string& what)
+{
+  if (value >
+      static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
+    throw std::runtime_error("ndtbl " + what + " exceeds supported size");
+  }
+  return static_cast<std::size_t>(value);
+}
+
+inline void
+require_zero(std::uint64_t value, const std::string& what)
+{
+  if (value != 0u) {
+    throw std::runtime_error("ndtbl " + what + " must be zero");
+  }
+}
+
+inline std::size_t
+fixed_header_size()
+{
+  return sizeof(file_magic) + sizeof(std::uint8_t) + sizeof(std::uint8_t) +
+         sizeof(std::uint16_t) + sizeof(std::uint64_t) * 4u;
+}
+
+inline std::size_t
+metadata_size(const GroupMetadata& metadata)
+{
+  std::size_t total = fixed_header_size();
+
+  for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
+    const Axis& axis_spec = metadata.axes[axis];
+    total = checked_add_size(total,
+                             sizeof(std::uint8_t) + sizeof(std::uint8_t) +
+                               sizeof(std::uint16_t) + sizeof(std::uint64_t),
+                             "metadata size");
+
+    if (axis_spec.kind() == axis_kind::uniform) {
+      total = checked_add_size(total, sizeof(double) * 2u, "metadata size");
+    } else {
+      total = checked_add_size(
+        total,
+        checked_multiply_size(axis_spec.size(), sizeof(double), "axis payload"),
+        "metadata size");
+    }
+  }
+
+  for (std::size_t field = 0; field < metadata.field_names.size(); ++field) {
+    total = checked_add_size(total, sizeof(std::uint64_t), "metadata size");
+    total = checked_add_size(
+      total, metadata.field_names[field].size(), "metadata size");
+  }
+
+  return total;
 }
 
 /**
@@ -129,40 +275,42 @@ write_group_stream_impl(std::ostream& os,
       "ndtbl metadata field count does not match field names");
   }
 
-  const std::size_t expected_values =
-    metadata.point_count * metadata.field_count;
+  const std::size_t expected_values = checked_multiply_size(
+    metadata.point_count, metadata.field_count, "payload value count");
   if (payload.size() != expected_values) {
     throw std::invalid_argument("ndtbl payload size does not match metadata");
   }
 
-  os.write(file_magic, sizeof(file_magic));
-  if (!os.good()) {
-    throw std::runtime_error("failed to write ndtbl header");
-  }
+  const std::size_t payload_offset = metadata_size(metadata);
 
-  write_pod(os, endian_marker);
-  write_pod<std::uint8_t>(os, 1u);
-  write_pod<std::uint8_t>(os, static_cast<std::uint8_t>(metadata.value_type));
-  write_pod<std::uint16_t>(os, 0u);
-  write_pod<std::uint64_t>(os, static_cast<std::uint64_t>(metadata.dimension));
-  write_pod<std::uint64_t>(os,
-                           static_cast<std::uint64_t>(metadata.field_count));
-  write_pod<std::uint64_t>(os,
-                           static_cast<std::uint64_t>(metadata.point_count));
+  write_bytes(os, file_magic, sizeof(file_magic));
+  write_uint_le<std::uint8_t>(os, 1u);
+  write_uint_le<std::uint8_t>(os,
+                              static_cast<std::uint8_t>(metadata.value_type));
+  write_uint_le<std::uint16_t>(os, 0u);
+  write_uint_le<std::uint64_t>(os, static_cast<std::uint64_t>(payload_offset));
+  write_uint_le<std::uint64_t>(os,
+                               static_cast<std::uint64_t>(metadata.dimension));
+  write_uint_le<std::uint64_t>(
+    os, static_cast<std::uint64_t>(metadata.field_count));
+  write_uint_le<std::uint64_t>(
+    os, static_cast<std::uint64_t>(metadata.point_count));
 
   for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
     const Axis& axis_spec = metadata.axes[axis];
-    write_pod<std::uint8_t>(os, static_cast<std::uint8_t>(axis_spec.kind()));
-    write_pod<std::uint8_t>(os, 0u);
-    write_pod<std::uint16_t>(os, 0u);
-    write_pod<std::uint64_t>(os, static_cast<std::uint64_t>(axis_spec.size()));
+    write_uint_le<std::uint8_t>(os,
+                                static_cast<std::uint8_t>(axis_spec.kind()));
+    write_uint_le<std::uint8_t>(os, 0u);
+    write_uint_le<std::uint16_t>(os, 0u);
+    write_uint_le<std::uint64_t>(os,
+                                 static_cast<std::uint64_t>(axis_spec.size()));
     if (axis_spec.kind() == axis_kind::uniform) {
-      write_pod(os, axis_spec.min());
-      write_pod(os, axis_spec.max());
+      write_float_le<double, std::uint64_t>(os, axis_spec.min());
+      write_float_le<double, std::uint64_t>(os, axis_spec.max());
     } else {
       const std::vector<double> coordinates = axis_spec.coordinates();
       for (std::size_t i = 0; i < coordinates.size(); ++i) {
-        write_pod(os, coordinates[i]);
+        write_float_le<double, std::uint64_t>(os, coordinates[i]);
       }
     }
   }
@@ -171,12 +319,17 @@ write_group_stream_impl(std::ostream& os,
     write_string(os, metadata.field_names[field]);
   }
 
-  if (payload.byte_size() != 0) {
-    os.write(reinterpret_cast<const char*>(payload.byte_data()),
-             static_cast<std::streamsize>(payload.byte_size()));
-  }
-  if (!os.good()) {
-    throw std::runtime_error("failed to write ndtbl field payload");
+  if (payload.size() != 0) {
+    if (host_is_little_endian()) {
+      write_bytes(os,
+                  reinterpret_cast<const char*>(payload.byte_data()),
+                  payload.byte_size());
+    } else {
+      for (std::size_t index = 0; index < payload.size(); ++index) {
+        write_float_le<Value, typename payload_uint<Value>::type>(
+          os, payload[index]);
+      }
+    }
   }
 }
 
@@ -222,20 +375,10 @@ inline void
 verify_magic(std::istream& is)
 {
   char magic[sizeof(file_magic)] = {};
-  is.read(magic, sizeof(magic));
-  if (!is.good() ||
-      !std::equal(magic, magic + sizeof(file_magic), file_magic)) {
+  read_bytes(is, magic, sizeof(magic));
+  if (!std::equal(magic, magic + sizeof(file_magic), file_magic)) {
     throw std::runtime_error("invalid ndtbl magic header");
   }
-}
-
-inline std::size_t
-checked_multiply_size(std::size_t lhs, std::size_t rhs, const std::string& what)
-{
-  if (lhs != 0 && rhs > std::numeric_limits<std::size_t>::max() / lhs) {
-    throw std::runtime_error("ndtbl " + what + " exceeds supported size");
-  }
-  return lhs * rhs;
 }
 
 inline std::size_t
@@ -268,40 +411,43 @@ inline parsed_group_layout
 read_group_layout_impl(std::istream& is)
 {
   verify_magic(is);
-  const std::uint32_t marker = read_pod<std::uint32_t>(is);
-  if (marker != endian_marker) {
-    throw std::runtime_error("unsupported ndtbl endianness");
-  }
 
-  const std::uint8_t version = read_pod<std::uint8_t>(is);
+  const std::uint8_t version = read_uint_le<std::uint8_t>(is);
   if (version != 1u) {
     throw std::runtime_error("unsupported ndtbl version");
   }
 
   GroupMetadata metadata;
-  metadata.value_type = static_cast<scalar_type>(read_pod<std::uint8_t>(is));
-  read_pod<std::uint16_t>(is);
+  metadata.value_type =
+    static_cast<scalar_type>(read_uint_le<std::uint8_t>(is));
+  require_zero(read_uint_le<std::uint16_t>(is), "header reserved field");
+  const std::size_t payload_offset =
+    narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "payload offset");
 
-  metadata.dimension = static_cast<std::size_t>(read_pod<std::uint64_t>(is));
-  metadata.field_count = static_cast<std::size_t>(read_pod<std::uint64_t>(is));
-  metadata.point_count = static_cast<std::size_t>(read_pod<std::uint64_t>(is));
+  metadata.dimension =
+    narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "dimension");
+  metadata.field_count =
+    narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "field count");
+  metadata.point_count =
+    narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "point count");
 
   metadata.axes.reserve(metadata.dimension);
   for (std::size_t axis = 0; axis < metadata.dimension; ++axis) {
-    const axis_kind kind = static_cast<axis_kind>(read_pod<std::uint8_t>(is));
-    read_pod<std::uint8_t>(is);
-    read_pod<std::uint16_t>(is);
+    const axis_kind kind =
+      static_cast<axis_kind>(read_uint_le<std::uint8_t>(is));
+    require_zero(read_uint_le<std::uint8_t>(is), "axis reserved byte");
+    require_zero(read_uint_le<std::uint16_t>(is), "axis reserved field");
     const std::size_t extent =
-      static_cast<std::size_t>(read_pod<std::uint64_t>(is));
+      narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "axis extent");
 
     if (kind == axis_kind::uniform) {
-      const double min_value = read_pod<double>(is);
-      const double max_value = read_pod<double>(is);
+      const double min_value = read_float_le<double, std::uint64_t>(is);
+      const double max_value = read_float_le<double, std::uint64_t>(is);
       metadata.axes.push_back(Axis::uniform(min_value, max_value, extent));
     } else if (kind == axis_kind::explicit_coordinates) {
       std::vector<double> coordinates(extent);
       for (std::size_t i = 0; i < extent; ++i) {
-        coordinates[i] = read_pod<double>(is);
+        coordinates[i] = read_float_le<double, std::uint64_t>(is);
       }
       metadata.axes.push_back(Axis::from_coordinates(coordinates));
     } else {
@@ -316,7 +462,8 @@ read_group_layout_impl(std::istream& is)
 
   std::size_t expected_point_count = 1;
   for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
-    expected_point_count *= metadata.axes[axis].size();
+    expected_point_count = checked_multiply_size(
+      expected_point_count, metadata.axes[axis].size(), "point count");
   }
   if (expected_point_count != metadata.point_count) {
     throw std::runtime_error("ndtbl point count does not match axis extents");
@@ -326,10 +473,15 @@ read_group_layout_impl(std::istream& is)
   if (payload_position < 0) {
     throw std::runtime_error("failed to determine ndtbl payload offset");
   }
+  const std::size_t actual_payload_offset =
+    static_cast<std::size_t>(payload_position);
+  if (actual_payload_offset != payload_offset) {
+    throw std::runtime_error("ndtbl payload offset does not match metadata");
+  }
 
   parsed_group_layout layout;
   layout.metadata = metadata;
-  layout.payload_offset = static_cast<std::size_t>(payload_position);
+  layout.payload_offset = actual_payload_offset;
   layout.value_count = checked_multiply_size(
     metadata.point_count, metadata.field_count, "payload value count");
   layout.payload_size = checked_multiply_size(
@@ -356,10 +508,20 @@ inline std::vector<Value>
 read_payload(std::istream& is, std::size_t value_count)
 {
   std::vector<Value> values(value_count);
-  is.read(reinterpret_cast<char*>(values.data()),
-          static_cast<std::streamsize>(values.size() * sizeof(Value)));
-  if (!is.good()) {
-    throw std::runtime_error("failed to read ndtbl field payload");
+  if (value_count == 0) {
+    return values;
+  }
+
+  if (host_is_little_endian()) {
+    read_bytes(is,
+               reinterpret_cast<char*>(values.data()),
+               values.size() * sizeof(Value));
+    return values;
+  }
+
+  for (std::size_t index = 0; index < value_count; ++index) {
+    values[index] =
+      read_float_le<Value, typename payload_uint<Value>::type>(is);
   }
   return values;
 }

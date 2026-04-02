@@ -17,8 +17,10 @@ namespace ndtbl {
  * @brief One grid plus one or more named fields stored in interleaved flat
  * memory.
  *
- * The storage layout is point-major:
+ * The storage layout is point-major in row-major grid order:
  * `point0.field0, point0.field1, ..., point1.field0, ...`
+ * where the last grid axis varies fastest before stepping to the next field
+ * tuple.
  * so that one prepared interpolation query can accumulate all fields together.
  */
 template<class Value, std::size_t Dim>

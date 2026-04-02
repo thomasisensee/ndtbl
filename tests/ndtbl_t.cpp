@@ -4,7 +4,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -51,6 +53,31 @@ write_file_bytes(const std::string& path, const std::vector<char>& bytes)
   if (!output.good()) {
     throw std::runtime_error("failed to write test file bytes");
   }
+}
+
+template<class UInt>
+void
+append_uint_le(std::vector<char>& bytes, UInt value)
+{
+  for (std::size_t index = 0; index < sizeof(UInt); ++index) {
+    bytes.push_back(static_cast<char>((value >> (index * 8u)) & 0xffu));
+  }
+}
+
+void
+append_double_le(std::vector<char>& bytes, double value)
+{
+  std::uint64_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  append_uint_le(bytes, bits);
+}
+
+void
+append_float_le(std::vector<char>& bytes, float value)
+{
+  std::uint32_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  append_uint_le(bytes, bits);
 }
 
 } // namespace
@@ -168,6 +195,85 @@ TEST_CASE("typed loader rejects truncated payload files", "[io]")
   write_file_bytes(path, bytes);
 
   REQUIRE_THROWS_AS(ndtbl::read_group<1>(path), std::runtime_error);
+
+  std::remove(path.c_str());
+}
+
+TEST_CASE("writer produces the documented little-endian layout", "[io]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(2.0, 2.0, 1),
+  };
+  const ndtbl::FieldGroup<float, 1> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 1.5f });
+
+  const std::string path = temporary_path();
+  ndtbl::write_group(path, group);
+
+  std::vector<char> expected;
+  expected.insert(expected.end(), { 'N', 'D', 'T', 'B', 'L', '1', '\0', '\0' });
+  append_uint_le<std::uint8_t>(expected, 1u);
+  append_uint_le<std::uint8_t>(expected, 1u);
+  append_uint_le<std::uint16_t>(expected, 0u);
+  append_uint_le<std::uint64_t>(expected, 81u);
+  append_uint_le<std::uint64_t>(expected, 1u);
+  append_uint_le<std::uint64_t>(expected, 1u);
+  append_uint_le<std::uint64_t>(expected, 1u);
+  append_uint_le<std::uint8_t>(expected, 1u);
+  append_uint_le<std::uint8_t>(expected, 0u);
+  append_uint_le<std::uint16_t>(expected, 0u);
+  append_uint_le<std::uint64_t>(expected, 1u);
+  append_double_le(expected, 2.0);
+  append_double_le(expected, 2.0);
+  append_uint_le<std::uint64_t>(expected, 1u);
+  expected.push_back('A');
+  append_float_le(expected, 1.5f);
+
+  REQUIRE(read_file_bytes(path) == expected);
+
+  std::remove(path.c_str());
+}
+
+TEST_CASE("typed loader rejects nonzero reserved header fields", "[io]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<double, 1> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
+
+  const std::string path = temporary_path();
+  ndtbl::write_group(path, group);
+
+  std::vector<char> bytes = read_file_bytes(path);
+  REQUIRE(bytes.size() > 11);
+  bytes[10] = 1;
+  write_file_bytes(path, bytes);
+
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), std::runtime_error);
+
+  std::remove(path.c_str());
+}
+
+TEST_CASE("typed loader rejects mismatched payload offsets", "[io]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<double, 1> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
+
+  const std::string path = temporary_path();
+  ndtbl::write_group(path, group);
+
+  std::vector<char> bytes = read_file_bytes(path);
+  REQUIRE(bytes.size() > 19);
+  for (std::size_t index = 12; index < 20; ++index) {
+    bytes[index] = 0;
+  }
+  write_file_bytes(path, bytes);
+
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), std::runtime_error);
 
   std::remove(path.c_str());
 }

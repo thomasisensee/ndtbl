@@ -224,10 +224,4 @@ private:
   std::shared_ptr<const Concept> impl_;
 };
 
-/**
- * @brief Backward-compatible alias for the runtime-erased loaded group type.
- */
-template<std::size_t Dim>
-using AnyFieldGroup = LoadedFieldGroup<Dim>;
-
 } // namespace ndtbl

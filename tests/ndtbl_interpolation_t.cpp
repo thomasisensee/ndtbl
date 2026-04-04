@@ -209,7 +209,7 @@ TEST_CASE("field group clamps explicit-axis queries outside the domain",
   require_clamped_linear_recovery(axes, { -5.0, 8.0 });
 }
 
-TEST_CASE("loaded field groups preserve exact interpolation on uniform axes",
+TEST_CASE("runtime field groups preserve exact interpolation on uniform axes",
           "[io][interpolation]")
 {
   const std::array<ndtbl::Axis, 2> axes = {
@@ -220,7 +220,7 @@ TEST_CASE("loaded field groups preserve exact interpolation on uniform axes",
   require_loaded_linear_recovery(axes, { 0.25, 2.75 });
 }
 
-TEST_CASE("loaded field groups preserve exact interpolation on explicit axes",
+TEST_CASE("runtime field groups preserve exact interpolation on explicit axes",
           "[io][interpolation]")
 {
   const std::array<ndtbl::Axis, 2> axes = {

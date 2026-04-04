@@ -112,7 +112,7 @@ require_loaded_linear_recovery(const std::array<ndtbl::Axis, Dim>& axes,
   const std::string path = ndtbl_test::temporary_path();
   ndtbl::write_group(path, group);
 
-  const ndtbl::LoadedFieldGroup<Dim> loaded = ndtbl::read_group<Dim>(path);
+  const ndtbl::RuntimeFieldGroup<Dim> loaded = ndtbl::read_group<Dim>(path);
   std::array<double, 2> values = { 0.0, 0.0 };
   loaded.evaluate_all_into(query, values.data());
 

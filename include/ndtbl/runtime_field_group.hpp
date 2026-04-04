@@ -25,13 +25,13 @@ write_group_stream(std::ostream& os, const FieldGroup<Value, Dim>& group);
  * type is selected from file metadata at runtime.
  */
 template<std::size_t Dim>
-class LoadedFieldGroup
+class RuntimeFieldGroup
 {
 public:
   /**
    * @brief Construct an empty runtime-erased group handle.
    */
-  LoadedFieldGroup() {}
+  RuntimeFieldGroup() {}
 
   /**
    * @brief Construct a runtime-erased wrapper from a typed field group.
@@ -41,7 +41,7 @@ public:
    * @see FieldGroup
    */
   template<class Value>
-  explicit LoadedFieldGroup(const FieldGroup<Value, Dim>& group)
+  explicit RuntimeFieldGroup(const FieldGroup<Value, Dim>& group)
     : impl_(std::make_shared<Model<Value>>(group))
   {
   }

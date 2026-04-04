@@ -1,7 +1,7 @@
 import numpy as np
 
 from ndtbl import FieldGroup, UniformAxis, read_group, write_group
-from ndtbl.cli import main
+from ndtbl.cli import _INSPECT_BANNER, main
 
 
 def test_inspect_prints_key_metadata_and_default_samples(
@@ -15,6 +15,7 @@ def test_inspect_prints_key_metadata_and_default_samples(
     result = runner.invoke(main, ["inspect", str(path)])
 
     assert result.exit_code == 0
+    assert f"{_INSPECT_BANNER}\n\nfile: {path}" in result.output
     assert f"file: {path}" in result.output
     assert "dimension: 2" in result.output
     assert "fields: 2" in result.output
@@ -26,6 +27,22 @@ def test_inspect_prints_key_metadata_and_default_samples(
     assert "sample[0]: (0, 1)" in result.output
     assert "sample[4]: (8, 9)" in result.output
     assert "sample[5]" not in result.output
+
+
+def test_inspect_no_banner_suppresses_ascii_header(
+    runner,
+    tmp_path,
+    sample_uniform_group,
+) -> None:
+    path = tmp_path / "inspect-no-banner.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    result = runner.invoke(main, ["inspect", str(path), "--no-banner"])
+
+    assert result.exit_code == 0
+    assert _INSPECT_BANNER not in result.output
+    assert f"file: {path}" in result.output
+    assert "samples: 5" in result.output
 
 
 def test_inspect_short_samples_option_limits_output(
@@ -42,6 +59,18 @@ def test_inspect_short_samples_option_limits_output(
     assert "samples: 1" in result.output
     assert "sample[0]: (0, 1)" in result.output
     assert "sample[1]" not in result.output
+
+
+def test_inspect_invalid_file_reports_error_without_banner(
+    runner, tmp_path
+) -> None:
+    path = tmp_path / "invalid.ndtbl"
+    path.write_bytes(b"not an ndtbl file")
+
+    result = runner.invoke(main, ["inspect", str(path)])
+
+    assert result.exit_code != 0
+    assert _INSPECT_BANNER not in result.output
 
 
 def test_query_prints_values_for_requested_point(

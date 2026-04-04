@@ -36,7 +36,7 @@ target_sources(ndtbl
       include/ndtbl/axis.hpp
       include/ndtbl/grid.hpp
       include/ndtbl/field_group.hpp
-      include/ndtbl/any_field_group.hpp
+      include/ndtbl/runtime_field_group.hpp
       include/ndtbl/metadata.hpp
       include/ndtbl/payload.hpp
       include/ndtbl/io.hpp

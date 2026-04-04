@@ -18,7 +18,7 @@ API reference
 .. doxygenclass:: ndtbl::FieldGroup
    :members:
 
-.. doxygenclass:: ndtbl::LoadedFieldGroup
+.. doxygenclass:: ndtbl::RuntimeFieldGroup
    :members:
 
 .. doxygenstruct:: ndtbl::GroupMetadata

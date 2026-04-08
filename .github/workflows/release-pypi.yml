@@ -137,6 +137,4 @@ jobs:
 
       - name: Publish distributions to PyPI
         run: |
-          uv publish --index pypi \
-            --config-file ${{ github.workspace }}/python/ndtbl/uv.toml \
-            dist/*
+          uv publish dist/*

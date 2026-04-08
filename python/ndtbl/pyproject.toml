@@ -29,10 +29,8 @@ repository = "https://github.com/thomasisensee/ndtbl"
 
 [project.optional-dependencies]
 docs = [
-    "breathe",
     "myst_parser",
     "sphinx",
-    "sphinx_mdinclude",
     "sphinx_rtd_theme",
 ]
 lint = [

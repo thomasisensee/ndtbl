@@ -8,3 +8,5 @@ ndtbl
    intro
    format
    cppapi
+   pythonintro
+   pythonapi

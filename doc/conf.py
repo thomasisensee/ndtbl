@@ -31,6 +31,7 @@ author = "Thomas Isensee"
 extensions = [
     "breathe",
     "myst_parser",
+    "sphinx.ext.autodoc",
     "sphinx_rtd_theme",
 ]
 

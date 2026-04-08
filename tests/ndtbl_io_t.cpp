@@ -41,7 +41,7 @@ TEST_CASE("typed loader round-trips metadata and float payloads", "[io]")
   std::remove(path.c_str());
 }
 
-TEST_CASE("loaded field group can be rewritten after reading", "[io]")
+TEST_CASE("runtime field group can be rewritten after reading", "[io]")
 {
   const std::array<ndtbl::Axis, 2> axes = {
     ndtbl::Axis::uniform(0.0, 1.0, 2),

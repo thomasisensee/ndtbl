@@ -13,6 +13,18 @@ from .io import read_group, write_group
 from .model import ExplicitAxis, FieldGroup, GroupMetadata, UniformAxis
 
 DEFAULT_MAX_SIZE_MIB = 128.0
+_INSPECT_BANNER = r"""
+|========================================|
+|           __  __    __       ___       |
+|          /\ \/\ \__/\ \     /\_ \      |
+|   ___    \_\ \ \ ,_\ \ \____\//\ \     |
+| /' _ `\  /'_` \ \ \/\ \ '__`\ \ \ \    |
+| /\ \/\ \/\ \L\ \ \ \_\ \ \L\ \ \_\ \_  |
+| \ \_\ \_\ \___,_\ \__\\ \_,__/ /\____\ |
+|  \/_/\/_/\/__,_ /\/__/ \/___/  \/____/ |
+|                                        |
+|========================================|
+"""
 
 
 class _HelpOnlyOption(click.Option):
@@ -66,6 +78,13 @@ def _echo_metadata(path: Path, metadata: GroupMetadata) -> None:
 
     for field_index, field_name in enumerate(metadata.field_names):
         click.echo(f"field[{field_index}]: {field_name}")
+
+
+def _echo_inspect_banner() -> None:
+    """Print the inspect command ASCII art header."""
+
+    click.echo(_INSPECT_BANNER)
+    click.echo()
 
 
 def _echo_samples(group: FieldGroup, samples: int) -> None:
@@ -274,7 +293,13 @@ def main() -> None:
     show_default=True,
     type=click.IntRange(min=0),
 )
-def inspect_command(file: Path, samples: int) -> None:
+@click.option(
+    "--banner/--no-banner",
+    default=True,
+    show_default=True,
+    help="Show or hide the ASCII-art header.",
+)
+def inspect_command(file: Path, samples: int, banner: bool) -> None:
     """Print metadata and sample payload values from an .ndtbl file.
 
     FILE is the input ``.ndtbl`` path.
@@ -286,6 +311,8 @@ def inspect_command(file: Path, samples: int) -> None:
         group = read_group(file)
     except (OSError, ValueError) as error:
         raise click.ClickException(str(error)) from error
+    if banner:
+        _echo_inspect_banner()
     _echo_metadata(file, group.metadata())
     _echo_samples(group, samples)
 

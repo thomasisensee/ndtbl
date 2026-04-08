@@ -97,6 +97,13 @@ Inspect an existing file:
 ndtbl inspect example.ndtbl
 ```
 
+`inspect` prints an ASCII-art header by default after the file is read
+successfully. Suppress it when needed:
+
+```bash
+ndtbl inspect example.ndtbl --no-banner
+```
+
 Limit the number of printed sample points:
 
 ```bash

@@ -1,4 +1,5 @@
 breathe
 cmake
 myst-parser
+sphinx
 sphinx_rtd_theme

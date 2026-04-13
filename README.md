@@ -29,12 +29,10 @@ can stay file-backed instead of always being copied into heap memory.
 
 ## 🖥️ Which interface to use
 
-Use the C++ library when you want to integrate `.ndtbl` directly into a C++
-application.
+Use the C++ library when you want to integrate `.ndtbl` directly into a C++ application.
 
-Use the C++ tools when you want to convert OpenFOAM text tables or inspect
-`.ndtbl` files from this repository checkout. These tools are not prebuilt;
-they become available only after running the local CMake build.
+Use the C++ ndtbl-inspect tool when you want toinspect `.ndtbl` files from this repository checkout.
+This tool is not prebuilt; it becomes available only after running the local CMake build.
 
 Use the Python package when you want a pip-installable workflow or a ready-made
 CLI for:
@@ -64,9 +62,8 @@ cmake -B build -Dndtbl_BUILD_TESTING=OFF -Dndtbl_BUILD_DOCS=OFF
 cmake --build build
 ```
 
-This produces the C++ command-line tools in `build/app/`:
+This produces the C++ command-line tool in `build/app/`:
 
-- `build/app/ndtbl-convert`
 - `build/app/ndtbl-inspect`
 
 Relevant CMake options:
@@ -96,19 +93,7 @@ cmake --build build
 
 ## ⚙️ C++ Tool Workflow
 
-Convert one or more OpenFOAM text tables into a single `.ndtbl` file:
-
-```bash
-./build/app/ndtbl-convert output.ndtbl Table1_table Table2_table
-```
-
-Choose the stored value precision explicitly:
-
-```bash
-./build/app/ndtbl-convert --precision float output.ndtbl Table1_table Table2_table
-```
-
-Inspect the generated file:
+Inspect existing `.ndtbl` files:
 
 ```bash
 ./build/app/ndtbl-inspect output.ndtbl

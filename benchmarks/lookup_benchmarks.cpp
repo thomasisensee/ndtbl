@@ -9,15 +9,6 @@
 
 namespace {
 
-/**
- * @brief Axis representation used by one benchmark table family.
- */
-enum class AxisLayout
-{
-  uniform,
-  explicit_coordinates
-};
-
 /// Field count used by field-independent preparation benchmarks.
 constexpr std::size_t prepare_field_count = 2;
 /// Number of precomputed query points in the ring cycled by timed loops.
@@ -102,18 +93,18 @@ filled_shape(std::size_t extent)
  *
  * @tparam Dim Benchmark dimensionality.
  * @param shape Number of support points on each axis.
- * @param layout Axis representation to construct.
+ * @param axis_kind Axis representation to construct.
  * @return Axis descriptors in dimension order.
  */
 template<std::size_t Dim>
 std::array<ndtbl::Axis, Dim>
-make_axes(const std::array<std::size_t, Dim>& shape, AxisLayout layout)
+make_axes(const std::array<std::size_t, Dim>& shape, ndtbl::axis_kind axis_kind)
 {
   std::array<ndtbl::Axis, Dim> axes = {};
   for (std::size_t axis = 0; axis < Dim; ++axis) {
     const double min_value = -1.0 - static_cast<double>(axis);
     const double max_value = 1.0 + 0.5 * static_cast<double>(axis);
-    if (layout == AxisLayout::uniform) {
+    if (axis_kind == ndtbl::axis_kind::uniform) {
       axes[axis] = ndtbl::Axis::uniform(min_value, max_value, shape[axis]);
     } else {
       std::vector<double> coordinates(shape[axis], min_value);
@@ -225,16 +216,18 @@ make_queries(const std::array<ndtbl::Axis, Dim>& axes, std::size_t count)
  *
  * @tparam Dim Benchmark dimensionality.
  * @param extent Number of support points per axis.
- * @param layout Axis representation to benchmark.
+ * @param axis_kind Axis representation to benchmark.
  * @param field_count Number of fields to store at each grid point.
  * @return Fully initialized lookup context.
  */
 template<std::size_t Dim>
 LookupContext<Dim>
-make_context(std::size_t extent, AxisLayout layout, std::size_t field_count)
+make_context(std::size_t extent,
+             ndtbl::axis_kind axis_kind,
+             std::size_t field_count)
 {
   const std::array<std::size_t, Dim> shape = filled_shape<Dim>(extent);
-  const std::array<ndtbl::Axis, Dim> axes = make_axes(shape, layout);
+  const std::array<ndtbl::Axis, Dim> axes = make_axes(shape, axis_kind);
   const ndtbl::Grid<Dim> grid(axes);
   const ndtbl::FieldGroup<double, Dim> group(
     grid, make_field_names<Dim>(field_count), make_payload(grid, field_count));
@@ -242,52 +235,52 @@ make_context(std::size_t extent, AxisLayout layout, std::size_t field_count)
 }
 
 /**
- * @brief Return cached context state for one dimension and axis layout.
+ * @brief Return cached context state for one dimension and axis kind.
  *
  * Static storage keeps setup outside benchmark timing and ensures each
  * benchmark family constructs its table only once per process.
  *
  * @tparam Dim Benchmark dimensionality.
  * @param extent Expected extent for the selected dimensionality.
- * @param layout Axis representation to benchmark.
+ * @param axis_kind Axis representation to benchmark.
  * @param field_count Number of fields to store at each grid point.
  * @return Reusable lookup context.
  */
 template<std::size_t Dim>
 const LookupContext<Dim>&
-context(std::size_t extent, AxisLayout layout, std::size_t field_count)
+context(std::size_t extent, ndtbl::axis_kind axis_kind, std::size_t field_count)
 {
   const std::size_t context_extent =
     extent == default_extent<Dim>() ? extent : default_extent<Dim>();
 
-  if (layout == AxisLayout::uniform) {
+  if (axis_kind == ndtbl::axis_kind::uniform) {
     if (field_count == 2) {
       static const LookupContext<Dim> uniform_2 =
-        make_context<Dim>(context_extent, AxisLayout::uniform, 2);
+        make_context<Dim>(context_extent, ndtbl::axis_kind::uniform, 2);
       return uniform_2;
     }
     if (field_count == 4) {
       static const LookupContext<Dim> uniform_4 =
-        make_context<Dim>(context_extent, AxisLayout::uniform, 4);
+        make_context<Dim>(context_extent, ndtbl::axis_kind::uniform, 4);
       return uniform_4;
     }
     static const LookupContext<Dim> uniform_8 =
-      make_context<Dim>(context_extent, AxisLayout::uniform, 8);
+      make_context<Dim>(context_extent, ndtbl::axis_kind::uniform, 8);
     return uniform_8;
   }
 
   if (field_count == 2) {
-    static const LookupContext<Dim> explicit_2 =
-      make_context<Dim>(context_extent, AxisLayout::explicit_coordinates, 2);
+    static const LookupContext<Dim> explicit_2 = make_context<Dim>(
+      context_extent, ndtbl::axis_kind::explicit_coordinates, 2);
     return explicit_2;
   }
   if (field_count == 4) {
-    static const LookupContext<Dim> explicit_4 =
-      make_context<Dim>(context_extent, AxisLayout::explicit_coordinates, 4);
+    static const LookupContext<Dim> explicit_4 = make_context<Dim>(
+      context_extent, ndtbl::axis_kind::explicit_coordinates, 4);
     return explicit_4;
   }
-  static const LookupContext<Dim> explicit_8 =
-    make_context<Dim>(context_extent, AxisLayout::explicit_coordinates, 8);
+  static const LookupContext<Dim> explicit_8 = make_context<Dim>(
+    context_extent, ndtbl::axis_kind::explicit_coordinates, 8);
   return explicit_8;
 }
 
@@ -299,14 +292,16 @@ context(std::size_t extent, AxisLayout layout, std::size_t field_count)
  * @tparam Dim Benchmark dimensionality.
  * @param state Google Benchmark state.
  * @param extent Number of support points per axis.
- * @param layout Axis representation to benchmark.
+ * @param axis_kind Axis representation to benchmark.
  */
 template<std::size_t Dim>
 void
-bench_prepare(benchmark::State& state, std::size_t extent, AxisLayout layout)
+bench_prepare(benchmark::State& state,
+              std::size_t extent,
+              ndtbl::axis_kind axis_kind)
 {
   const LookupContext<Dim>& data =
-    context<Dim>(extent, layout, prepare_field_count);
+    context<Dim>(extent, axis_kind, prepare_field_count);
   std::size_t query = 0;
 
   for (auto _ : state) {
@@ -324,17 +319,17 @@ bench_prepare(benchmark::State& state, std::size_t extent, AxisLayout layout)
  * @tparam Dim Benchmark dimensionality.
  * @param state Google Benchmark state.
  * @param extent Number of support points per axis.
- * @param layout Axis representation to benchmark.
+ * @param axis_kind Axis representation to benchmark.
  * @param field_count Number of fields to evaluate at each lookup.
  */
 template<std::size_t Dim>
 void
 bench_prepared_evaluate(benchmark::State& state,
                         std::size_t extent,
-                        AxisLayout layout,
+                        ndtbl::axis_kind axis_kind,
                         std::size_t field_count)
 {
-  const LookupContext<Dim>& data = context<Dim>(extent, layout, field_count);
+  const LookupContext<Dim>& data = context<Dim>(extent, axis_kind, field_count);
   std::vector<double> results(data.group.field_count(), 0.0);
 
   for (auto _ : state) {
@@ -353,17 +348,17 @@ bench_prepared_evaluate(benchmark::State& state,
  * @tparam Dim Benchmark dimensionality.
  * @param state Google Benchmark state.
  * @param extent Number of support points per axis.
- * @param layout Axis representation to benchmark.
+ * @param axis_kind Axis representation to benchmark.
  * @param field_count Number of fields to evaluate at each lookup.
  */
 template<std::size_t Dim>
 void
 bench_typed_combined(benchmark::State& state,
                      std::size_t extent,
-                     AxisLayout layout,
+                     ndtbl::axis_kind axis_kind,
                      std::size_t field_count)
 {
-  const LookupContext<Dim>& data = context<Dim>(extent, layout, field_count);
+  const LookupContext<Dim>& data = context<Dim>(extent, axis_kind, field_count);
   std::vector<double> results(data.group.field_count(), 0.0);
   std::size_t query = 0;
 
@@ -384,17 +379,17 @@ bench_typed_combined(benchmark::State& state,
  * @tparam Dim Benchmark dimensionality.
  * @param state Google Benchmark state.
  * @param extent Number of support points per axis.
- * @param layout Axis representation to benchmark.
+ * @param axis_kind Axis representation to benchmark.
  * @param field_count Number of fields to evaluate at each lookup.
  */
 template<std::size_t Dim>
 void
 bench_runtime_combined(benchmark::State& state,
                        std::size_t extent,
-                       AxisLayout layout,
+                       ndtbl::axis_kind axis_kind,
                        std::size_t field_count)
 {
-  const LookupContext<Dim>& data = context<Dim>(extent, layout, field_count);
+  const LookupContext<Dim>& data = context<Dim>(extent, axis_kind, field_count);
   std::vector<double> results(data.runtime_group.field_count(), 0.0);
   std::size_t query = 0;
 
@@ -419,13 +414,13 @@ bench_runtime_combined(benchmark::State& state,
     bench_runtime_combined<DIM>, NAME, EXTENT, LAYOUT, FIELD_COUNT)
 
 /**
- * @brief Register one preparation benchmark for one dimension/layout pair.
+ * @brief Register one preparation benchmark for one dimension/axis-kind pair.
  */
 #define NDTBL_REGISTER_PREPARE_BENCHMARK(DIM, EXTENT, LAYOUT, NAME)            \
   BENCHMARK_CAPTURE(bench_prepare<DIM>, NAME, EXTENT, LAYOUT)
 
 /**
- * @brief Register all field-count variants for one dimension/layout pair.
+ * @brief Register all field-count variants for one dimension/axis-kind pair.
  */
 #define NDTBL_REGISTER_LOOKUP_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME)            \
   NDTBL_REGISTER_PREPARE_BENCHMARK(DIM, EXTENT, LAYOUT, NAME);                 \
@@ -435,27 +430,27 @@ bench_runtime_combined(benchmark::State& state,
 
 NDTBL_REGISTER_LOOKUP_BENCHMARKS(2,
                                  default_extent<2>(),
-                                 AxisLayout::uniform,
+                                 ndtbl::axis_kind::uniform,
                                  d2_uniform);
 NDTBL_REGISTER_LOOKUP_BENCHMARKS(2,
                                  default_extent<2>(),
-                                 AxisLayout::explicit_coordinates,
+                                 ndtbl::axis_kind::explicit_coordinates,
                                  d2_explicit);
 NDTBL_REGISTER_LOOKUP_BENCHMARKS(4,
                                  default_extent<4>(),
-                                 AxisLayout::uniform,
+                                 ndtbl::axis_kind::uniform,
                                  d4_uniform);
 NDTBL_REGISTER_LOOKUP_BENCHMARKS(4,
                                  default_extent<4>(),
-                                 AxisLayout::explicit_coordinates,
+                                 ndtbl::axis_kind::explicit_coordinates,
                                  d4_explicit);
 NDTBL_REGISTER_LOOKUP_BENCHMARKS(6,
                                  default_extent<6>(),
-                                 AxisLayout::uniform,
+                                 ndtbl::axis_kind::uniform,
                                  d6_uniform);
 NDTBL_REGISTER_LOOKUP_BENCHMARKS(6,
                                  default_extent<6>(),
-                                 AxisLayout::explicit_coordinates,
+                                 ndtbl::axis_kind::explicit_coordinates,
                                  d6_explicit);
 
 } // namespace

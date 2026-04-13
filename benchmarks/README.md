@@ -12,8 +12,8 @@ generation time.
 
 Each benchmark case uses a deterministic synthetic table with:
 
-- `8` fields per grid point
-- `1024` precomputed query points, cycled during each timed loop
+- `2`, `4`, or `8` fields per grid point for field-dependent measurements
+- `1024` precomputed query points in a ring, cycled during each timed loop
 - uniform and explicit-coordinate axis variants
 - 2D shape `256 x 256`
 - 4D shape `16 x 16 x 16 x 16`
@@ -22,22 +22,31 @@ Each benchmark case uses a deterministic synthetic table with:
 The 6D case is intentionally small in each axis so the payload stays modest
 while still exercising a 64-corner interpolation stencil.
 
+The query ring size is not the number of benchmark iterations. Google
+Benchmark chooses the number of timed iterations; each iteration advances to
+the next precomputed query modulo the ring size.
+
 ## Measured Operations
 
 `bench_prepare` measures only `Grid::prepare(query)`. This isolates axis
-bracketing and interpolation-stencil construction.
+bracketing and interpolation-stencil construction. It is registered once per
+dimension and axis layout because field count does not affect stencil
+preparation.
 
 `bench_prepared_evaluate` measures
 `FieldGroup::evaluate_all_into(prepared, results)`. This reuses one prepared
-stencil and isolates interpolation over all fields.
+stencil and isolates interpolation over all fields. It is registered with `2`,
+`4`, and `8` fields.
 
 `bench_typed_combined` measures
 `FieldGroup::evaluate_all_into(query, results)`. This is the typed end-to-end
-path from query coordinates to interpolated field values.
+path from query coordinates to interpolated field values. It is registered with
+`2`, `4`, and `8` fields.
 
 `bench_runtime_combined` measures
 `RuntimeFieldGroup::evaluate_all_into(query, results)`. This covers the
-runtime-erased path, including its wrapper dispatch and scratch-buffer copy.
+runtime-erased path, including its wrapper dispatch and scratch-buffer copy. It
+is registered with `2`, `4`, and `8` fields.
 
 ## Build And Run
 

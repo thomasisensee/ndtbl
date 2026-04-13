@@ -18,9 +18,9 @@ enum class AxisLayout
   explicit_coordinates
 };
 
-/// Number of fields stored at each grid point in all benchmark cases.
-constexpr std::size_t field_count = 8;
-/// Number of precomputed query points cycled by each timed benchmark loop.
+/// Field count used by field-independent preparation benchmarks.
+constexpr std::size_t prepare_field_count = 2;
+/// Number of precomputed query points in the ring cycled by timed loops.
 constexpr std::size_t query_count = 1024;
 
 /**
@@ -50,7 +50,8 @@ default_extent()
  * @brief Shared table data reused by one benchmark family.
  *
  * The context owns the grid, typed group, runtime-erased group, query ring, and
- * one prepared stencil so benchmark loops do not include setup allocation.
+ * one prepared stencil so benchmark loops do not include setup allocation. The
+ * field count is part of the context identity for field-dependent benchmarks.
  *
  * @tparam Dim Benchmark dimensionality.
  */
@@ -225,11 +226,12 @@ make_queries(const std::array<ndtbl::Axis, Dim>& axes, std::size_t count)
  * @tparam Dim Benchmark dimensionality.
  * @param extent Number of support points per axis.
  * @param layout Axis representation to benchmark.
+ * @param field_count Number of fields to store at each grid point.
  * @return Fully initialized lookup context.
  */
 template<std::size_t Dim>
 LookupContext<Dim>
-make_context(std::size_t extent, AxisLayout layout)
+make_context(std::size_t extent, AxisLayout layout, std::size_t field_count)
 {
   const std::array<std::size_t, Dim> shape = filled_shape<Dim>(extent);
   const std::array<ndtbl::Axis, Dim> axes = make_axes(shape, layout);
@@ -248,21 +250,45 @@ make_context(std::size_t extent, AxisLayout layout)
  * @tparam Dim Benchmark dimensionality.
  * @param extent Expected extent for the selected dimensionality.
  * @param layout Axis representation to benchmark.
+ * @param field_count Number of fields to store at each grid point.
  * @return Reusable lookup context.
  */
 template<std::size_t Dim>
 const LookupContext<Dim>&
-context(std::size_t extent, AxisLayout layout)
+context(std::size_t extent, AxisLayout layout, std::size_t field_count)
 {
-  static const LookupContext<Dim> uniform_context =
-    make_context<Dim>(default_extent<Dim>(), AxisLayout::uniform);
-  static const LookupContext<Dim> explicit_context =
-    make_context<Dim>(default_extent<Dim>(), AxisLayout::explicit_coordinates);
+  const std::size_t context_extent =
+    extent == default_extent<Dim>() ? extent : default_extent<Dim>();
 
-  if (extent == default_extent<Dim>() && layout == AxisLayout::uniform) {
-    return uniform_context;
+  if (layout == AxisLayout::uniform) {
+    if (field_count == 2) {
+      static const LookupContext<Dim> uniform_2 =
+        make_context<Dim>(context_extent, AxisLayout::uniform, 2);
+      return uniform_2;
+    }
+    if (field_count == 4) {
+      static const LookupContext<Dim> uniform_4 =
+        make_context<Dim>(context_extent, AxisLayout::uniform, 4);
+      return uniform_4;
+    }
+    static const LookupContext<Dim> uniform_8 =
+      make_context<Dim>(context_extent, AxisLayout::uniform, 8);
+    return uniform_8;
   }
-  return explicit_context;
+
+  if (field_count == 2) {
+    static const LookupContext<Dim> explicit_2 =
+      make_context<Dim>(context_extent, AxisLayout::explicit_coordinates, 2);
+    return explicit_2;
+  }
+  if (field_count == 4) {
+    static const LookupContext<Dim> explicit_4 =
+      make_context<Dim>(context_extent, AxisLayout::explicit_coordinates, 4);
+    return explicit_4;
+  }
+  static const LookupContext<Dim> explicit_8 =
+    make_context<Dim>(context_extent, AxisLayout::explicit_coordinates, 8);
+  return explicit_8;
 }
 
 /**
@@ -279,7 +305,8 @@ template<std::size_t Dim>
 void
 bench_prepare(benchmark::State& state, std::size_t extent, AxisLayout layout)
 {
-  const LookupContext<Dim>& data = context<Dim>(extent, layout);
+  const LookupContext<Dim>& data =
+    context<Dim>(extent, layout, prepare_field_count);
   std::size_t query = 0;
 
   for (auto _ : state) {
@@ -298,14 +325,16 @@ bench_prepare(benchmark::State& state, std::size_t extent, AxisLayout layout)
  * @param state Google Benchmark state.
  * @param extent Number of support points per axis.
  * @param layout Axis representation to benchmark.
+ * @param field_count Number of fields to evaluate at each lookup.
  */
 template<std::size_t Dim>
 void
 bench_prepared_evaluate(benchmark::State& state,
                         std::size_t extent,
-                        AxisLayout layout)
+                        AxisLayout layout,
+                        std::size_t field_count)
 {
-  const LookupContext<Dim>& data = context<Dim>(extent, layout);
+  const LookupContext<Dim>& data = context<Dim>(extent, layout, field_count);
   std::vector<double> results(data.group.field_count(), 0.0);
 
   for (auto _ : state) {
@@ -325,14 +354,16 @@ bench_prepared_evaluate(benchmark::State& state,
  * @param state Google Benchmark state.
  * @param extent Number of support points per axis.
  * @param layout Axis representation to benchmark.
+ * @param field_count Number of fields to evaluate at each lookup.
  */
 template<std::size_t Dim>
 void
 bench_typed_combined(benchmark::State& state,
                      std::size_t extent,
-                     AxisLayout layout)
+                     AxisLayout layout,
+                     std::size_t field_count)
 {
-  const LookupContext<Dim>& data = context<Dim>(extent, layout);
+  const LookupContext<Dim>& data = context<Dim>(extent, layout, field_count);
   std::vector<double> results(data.group.field_count(), 0.0);
   std::size_t query = 0;
 
@@ -354,14 +385,16 @@ bench_typed_combined(benchmark::State& state,
  * @param state Google Benchmark state.
  * @param extent Number of support points per axis.
  * @param layout Axis representation to benchmark.
+ * @param field_count Number of fields to evaluate at each lookup.
  */
 template<std::size_t Dim>
 void
 bench_runtime_combined(benchmark::State& state,
                        std::size_t extent,
-                       AxisLayout layout)
+                       AxisLayout layout,
+                       std::size_t field_count)
 {
-  const LookupContext<Dim>& data = context<Dim>(extent, layout);
+  const LookupContext<Dim>& data = context<Dim>(extent, layout, field_count);
   std::vector<double> results(data.runtime_group.field_count(), 0.0);
   std::size_t query = 0;
 
@@ -374,13 +407,31 @@ bench_runtime_combined(benchmark::State& state,
 }
 
 /**
- * @brief Register the four lookup benchmarks for one dimension/layout pair.
+ * @brief Register field-dependent lookup benchmarks for one field count.
+ */
+#define NDTBL_REGISTER_FIELD_BENCHMARKS(                                       \
+  DIM, EXTENT, LAYOUT, NAME, FIELD_COUNT)                                      \
+  BENCHMARK_CAPTURE(                                                           \
+    bench_prepared_evaluate<DIM>, NAME, EXTENT, LAYOUT, FIELD_COUNT);          \
+  BENCHMARK_CAPTURE(                                                           \
+    bench_typed_combined<DIM>, NAME, EXTENT, LAYOUT, FIELD_COUNT);             \
+  BENCHMARK_CAPTURE(                                                           \
+    bench_runtime_combined<DIM>, NAME, EXTENT, LAYOUT, FIELD_COUNT)
+
+/**
+ * @brief Register one preparation benchmark for one dimension/layout pair.
+ */
+#define NDTBL_REGISTER_PREPARE_BENCHMARK(DIM, EXTENT, LAYOUT, NAME)            \
+  BENCHMARK_CAPTURE(bench_prepare<DIM>, NAME, EXTENT, LAYOUT)
+
+/**
+ * @brief Register all field-count variants for one dimension/layout pair.
  */
 #define NDTBL_REGISTER_LOOKUP_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME)            \
-  BENCHMARK_CAPTURE(bench_prepare<DIM>, NAME, EXTENT, LAYOUT);                 \
-  BENCHMARK_CAPTURE(bench_prepared_evaluate<DIM>, NAME, EXTENT, LAYOUT);       \
-  BENCHMARK_CAPTURE(bench_typed_combined<DIM>, NAME, EXTENT, LAYOUT);          \
-  BENCHMARK_CAPTURE(bench_runtime_combined<DIM>, NAME, EXTENT, LAYOUT)
+  NDTBL_REGISTER_PREPARE_BENCHMARK(DIM, EXTENT, LAYOUT, NAME);                 \
+  NDTBL_REGISTER_FIELD_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME##_fields_2, 2);    \
+  NDTBL_REGISTER_FIELD_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME##_fields_4, 4);    \
+  NDTBL_REGISTER_FIELD_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME##_fields_8, 8)
 
 NDTBL_REGISTER_LOOKUP_BENCHMARKS(2,
                                  default_extent<2>(),

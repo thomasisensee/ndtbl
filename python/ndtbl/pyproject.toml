@@ -33,6 +33,7 @@ dependencies = [
 
 [project.urls]
 repository = "https://github.com/thomasisensee/ndtbl"
+documentation = "https://ndtbl.readthedocs.io/"
 
 [project.optional-dependencies]
 docs = [

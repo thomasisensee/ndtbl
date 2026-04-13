@@ -11,6 +11,7 @@ include(GNUInstallDirs)
 
 # Define build options
 option(ndtbl_BUILD_TESTING "Enable building of tests" OFF)
+option(ndtbl_BUILD_BENCHMARKS "Enable building of benchmarks" OFF)
 option(ndtbl_ENABLE_MMAP "Enable POSIX mmap-backed ndtbl payload reads" OFF)
 
 if(PROJECT_IS_TOP_LEVEL)
@@ -67,6 +68,10 @@ if(PROJECT_IS_TOP_LEVEL)
   if(ndtbl_BUILD_TESTING)
     add_subdirectory(tests)
   endif()
+endif()
+
+if(PROJECT_IS_TOP_LEVEL AND ndtbl_BUILD_BENCHMARKS)
+  add_subdirectory(benchmarks)
 endif()
 
 # Add the documentation

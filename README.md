@@ -72,6 +72,7 @@ This produces the C++ command-line tools in `build/app/`:
 Relevant CMake options:
 
 - `ndtbl_BUILD_TESTING`: build the C++ test suite, default `OFF`
+- `ndtbl_BUILD_BENCHMARKS`: build developer lookup benchmarks, default `OFF`
 - `ndtbl_BUILD_DOCS`: build the documentation, default `ON` for top-level builds
 - `ndtbl_ENABLE_MMAP`: enable POSIX-only `mmap`-backed payload reads, default `OFF`
 
@@ -159,6 +160,27 @@ Then run:
 ```bash
 cd build
 ctest --output-on-failure
+```
+
+## ⏱️ Benchmarks
+
+Lookup-time benchmarks are developer-only and are not part of CI by default.
+They use [Google Benchmark](https://github.com/google/benchmark) and measure
+query preparation, prepared evaluation, typed combined lookup, and
+runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See
+`benchmarks/README.md` for the benchmark case definitions and interpretation.
+
+Build the benchmark target:
+
+```bash
+cmake -B build -Dndtbl_BUILD_BENCHMARKS=ON
+cmake --build build --target ndtbl_lookup_benchmarks
+```
+
+Run a short smoke benchmark:
+
+```bash
+./build/benchmarks/ndtbl_lookup_benchmarks
 ```
 
 ## 📖 Documentation

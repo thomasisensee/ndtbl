@@ -165,9 +165,10 @@ ctest --output-on-failure
 ## ⏱️ Benchmarks
 
 Lookup-time benchmarks are developer-only and are not part of CI by default.
-They use [Google Benchmark](https://github.com/google/benchmark) and measure query preparation, prepared evaluation,
-typed combined lookup, and runtime-erased combined lookup for representative
-2D, 4D, and 6D tables.
+They use [Google Benchmark](https://github.com/google/benchmark) and measure
+query preparation, prepared evaluation, typed combined lookup, and
+runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See
+`benchmarks/README.md` for the benchmark case definitions and interpretation.
 
 Build the benchmark target:
 

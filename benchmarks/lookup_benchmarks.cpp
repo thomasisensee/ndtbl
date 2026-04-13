@@ -9,15 +9,29 @@
 
 namespace {
 
+/**
+ * @brief Axis representation used by one benchmark table family.
+ */
 enum class AxisLayout
 {
   uniform,
   explicit_coordinates
 };
 
+/// Number of fields stored at each grid point in all benchmark cases.
 constexpr std::size_t field_count = 8;
+/// Number of precomputed query points cycled by each timed benchmark loop.
 constexpr std::size_t query_count = 1024;
 
+/**
+ * @brief Return the per-axis extent used for a benchmark dimension.
+ *
+ * The extents keep memory use modest while covering 2D, 4D, and 6D stencil
+ * sizes.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @return Extent used for every axis in the selected dimensionality.
+ */
 template<std::size_t Dim>
 constexpr std::size_t
 default_extent()
@@ -32,6 +46,14 @@ default_extent()
   }
 }
 
+/**
+ * @brief Shared table data reused by one benchmark family.
+ *
+ * The context owns the grid, typed group, runtime-erased group, query ring, and
+ * one prepared stencil so benchmark loops do not include setup allocation.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ */
 template<std::size_t Dim>
 struct LookupContext
 {
@@ -53,6 +75,13 @@ struct LookupContext
   }
 };
 
+/**
+ * @brief Build a hypercube shape with the same extent on every axis.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param extent Number of support points per axis.
+ * @return Shape array with `Dim` entries.
+ */
 template<std::size_t Dim>
 std::array<std::size_t, Dim>
 filled_shape(std::size_t extent)
@@ -64,6 +93,17 @@ filled_shape(std::size_t extent)
   return shape;
 }
 
+/**
+ * @brief Construct either uniform or explicit axes for one benchmark family.
+ *
+ * Explicit axes use a curved coordinate distribution to exercise the
+ * binary-search bracketing path instead of the uniform-axis arithmetic path.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param shape Number of support points on each axis.
+ * @param layout Axis representation to construct.
+ * @return Axis descriptors in dimension order.
+ */
 template<std::size_t Dim>
 std::array<ndtbl::Axis, Dim>
 make_axes(const std::array<std::size_t, Dim>& shape, AxisLayout layout)
@@ -90,6 +130,13 @@ make_axes(const std::array<std::size_t, Dim>& shape, AxisLayout layout)
   return axes;
 }
 
+/**
+ * @brief Construct synthetic field names for a benchmark table.
+ *
+ * @tparam Dim Benchmark dimensionality, unused but kept for call-site symmetry.
+ * @param field_count Number of field names to create.
+ * @return Names in payload storage order.
+ */
 template<std::size_t Dim>
 std::vector<std::string>
 make_field_names(std::size_t field_count)
@@ -102,6 +149,17 @@ make_field_names(std::size_t field_count)
   return names;
 }
 
+/**
+ * @brief Create deterministic point-major field payload values.
+ *
+ * The payload is not part of the measured setup. It provides stable values for
+ * interpolation loops and stores `field_count` values for each grid point.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param grid Grid whose support points define the payload layout.
+ * @param field_count Number of fields per support point.
+ * @return Point-major interleaved payload.
+ */
 template<std::size_t Dim>
 std::vector<double>
 make_payload(const ndtbl::Grid<Dim>& grid, std::size_t field_count)
@@ -129,6 +187,17 @@ make_payload(const ndtbl::Grid<Dim>& grid, std::size_t field_count)
   return payload;
 }
 
+/**
+ * @brief Create deterministic query points inside the table domain.
+ *
+ * Queries are precomputed and cycled in the benchmark loops to avoid measuring
+ * query generation while avoiding one constant lookup point.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param axes Axis descriptors used to bound generated queries.
+ * @param count Number of query points to generate.
+ * @return Query coordinates in axis order.
+ */
 template<std::size_t Dim>
 std::vector<std::array<double, Dim>>
 make_queries(const std::array<ndtbl::Axis, Dim>& axes, std::size_t count)
@@ -150,6 +219,14 @@ make_queries(const std::array<ndtbl::Axis, Dim>& axes, std::size_t count)
   return queries;
 }
 
+/**
+ * @brief Construct all reusable state for one benchmark family.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param extent Number of support points per axis.
+ * @param layout Axis representation to benchmark.
+ * @return Fully initialized lookup context.
+ */
 template<std::size_t Dim>
 LookupContext<Dim>
 make_context(std::size_t extent, AxisLayout layout)
@@ -162,6 +239,17 @@ make_context(std::size_t extent, AxisLayout layout)
   return LookupContext<Dim>(grid, group, make_queries(axes, query_count));
 }
 
+/**
+ * @brief Return cached context state for one dimension and axis layout.
+ *
+ * Static storage keeps setup outside benchmark timing and ensures each
+ * benchmark family constructs its table only once per process.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param extent Expected extent for the selected dimensionality.
+ * @param layout Axis representation to benchmark.
+ * @return Reusable lookup context.
+ */
 template<std::size_t Dim>
 const LookupContext<Dim>&
 context(std::size_t extent, AxisLayout layout)
@@ -177,6 +265,16 @@ context(std::size_t extent, AxisLayout layout)
   return explicit_context;
 }
 
+/**
+ * @brief Benchmark axis bracketing and interpolation-stencil preparation.
+ *
+ * Measures `Grid::prepare(query)` only.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param state Google Benchmark state.
+ * @param extent Number of support points per axis.
+ * @param layout Axis representation to benchmark.
+ */
 template<std::size_t Dim>
 void
 bench_prepare(benchmark::State& state, std::size_t extent, AxisLayout layout)
@@ -191,6 +289,16 @@ bench_prepare(benchmark::State& state, std::size_t extent, AxisLayout layout)
   }
 }
 
+/**
+ * @brief Benchmark interpolation using a precomputed stencil.
+ *
+ * Measures `FieldGroup::evaluate_all_into(prepared, results)` only.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param state Google Benchmark state.
+ * @param extent Number of support points per axis.
+ * @param layout Axis representation to benchmark.
+ */
 template<std::size_t Dim>
 void
 bench_prepared_evaluate(benchmark::State& state,
@@ -207,6 +315,17 @@ bench_prepared_evaluate(benchmark::State& state,
   }
 }
 
+/**
+ * @brief Benchmark typed end-to-end lookup from query coordinates.
+ *
+ * Measures `FieldGroup::evaluate_all_into(query, results)`, including stencil
+ * preparation and interpolation.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param state Google Benchmark state.
+ * @param extent Number of support points per axis.
+ * @param layout Axis representation to benchmark.
+ */
 template<std::size_t Dim>
 void
 bench_typed_combined(benchmark::State& state,
@@ -225,6 +344,17 @@ bench_typed_combined(benchmark::State& state,
   }
 }
 
+/**
+ * @brief Benchmark runtime-erased end-to-end lookup from query coordinates.
+ *
+ * Measures `RuntimeFieldGroup::evaluate_all_into(query, results)`, including
+ * wrapper dispatch and scratch-buffer handling.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param state Google Benchmark state.
+ * @param extent Number of support points per axis.
+ * @param layout Axis representation to benchmark.
+ */
 template<std::size_t Dim>
 void
 bench_runtime_combined(benchmark::State& state,
@@ -243,6 +373,9 @@ bench_runtime_combined(benchmark::State& state,
   }
 }
 
+/**
+ * @brief Register the four lookup benchmarks for one dimension/layout pair.
+ */
 #define NDTBL_REGISTER_LOOKUP_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME)            \
   BENCHMARK_CAPTURE(bench_prepare<DIM>, NAME, EXTENT, LAYOUT);                 \
   BENCHMARK_CAPTURE(bench_prepared_evaluate<DIM>, NAME, EXTENT, LAYOUT);       \

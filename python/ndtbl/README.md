@@ -45,16 +45,15 @@ python -m pip install -v -e .[lint,tests]
 
 ## 🐍 Python API
 
-The core API revolves around `FieldGroup`, `UniformAxis`, `read_group`, and
-`write_group`.
+The core API revolves around `FieldGroup`, `UniformAxis`, `ExplicitAxis`, `read_group`, and `write_group`.
 
 ```python
 import numpy as np
 
-from ndtbl import FieldGroup, UniformAxis, read_group, write_group
+from ndtbl import FieldGroup, UniformAxis, ExplicitAxis, read_group, write_group
 
 group = FieldGroup(
-    axes=(UniformAxis(0.0, 1.0, 3), UniformAxis(10.0, 20.0, 2)),
+    axes=(ExplicitAxis([0.0, 0.1, 1.0]), UniformAxis(10.0, 20.0, 2)),
     field_names=("A", "B"),
     values=np.array(
         [

@@ -188,14 +188,23 @@ public:
   /**
    * @brief Locate the interpolation interval and upper weight for a query.
    *
-   * Values outside the axis range are clamped to the nearest interval endpoint.
+   * Values outside the axis range are clamped to the nearest interval endpoint
+   * by default, or rejected when `policy` is `bounds_policy::throw_error`.
    * The returned pair is `(lower_index, upper_weight)`.
    *
    * @param value Coordinate value to bracket.
+   * @param policy Bounds handling behavior for out-of-domain values.
    * @return Pair of lower interval index and upper interpolation weight.
    */
-  std::pair<std::size_t, double> bracket(double value) const
+  std::pair<std::size_t, double> bracket(
+    double value,
+    bounds_policy policy = bounds_policy::clamp) const
   {
+    if (policy == bounds_policy::throw_error &&
+        (value < min_ || value > max_)) {
+      throw std::out_of_range("axis query coordinate outside bounds");
+    }
+
     if (size_ == 1) {
       return std::make_pair(std::size_t(0), 0.0);
     }

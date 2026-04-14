@@ -24,6 +24,15 @@ enum class scalar_type : std::uint8_t
 };
 
 /**
+ * @brief Controls how interpolation queries outside the grid domain behave.
+ */
+enum class bounds_policy : std::uint8_t
+{
+  clamp = 1,
+  throw_error = 2
+};
+
+/**
  * @brief Map a supported C++ scalar type to the ndtbl on-disk type tag.
  *
  * Only `float` and `double` are supported in the current implementation.

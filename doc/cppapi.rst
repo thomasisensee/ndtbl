@@ -28,4 +28,6 @@ API reference
 
 .. doxygenenum:: ndtbl::scalar_type
 
+.. doxygenenum:: ndtbl::bounds_policy
+
 .. doxygenfunction:: ndtbl::read_group_metadata(const std::string &path)

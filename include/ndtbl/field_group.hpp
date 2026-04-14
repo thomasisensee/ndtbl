@@ -177,12 +177,14 @@ public:
    *
    * @param coordinates Query coordinates in grid axis order.
    * @return Interpolated field values in storage order.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
    * @see evaluate_all(const PreparedQuery<Dim>&)
    */
   std::vector<Value> evaluate_all(
-    const std::array<double, Dim>& coordinates) const
+    const std::array<double, Dim>& coordinates,
+    bounds_policy policy = bounds_policy::clamp) const
   {
-    return evaluate_all(grid_.prepare(coordinates));
+    return evaluate_all(grid_.prepare(coordinates, policy));
   }
 
   /**
@@ -191,12 +193,14 @@ public:
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param results Output buffer with space for `field_count()` values.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
    * @see evaluate_all_into(const PreparedQuery<Dim>&, Value*)
    */
   void evaluate_all_into(const std::array<double, Dim>& coordinates,
-                         Value* results) const
+                         Value* results,
+                         bounds_policy policy = bounds_policy::clamp) const
   {
-    evaluate_all_into(grid_.prepare(coordinates), results);
+    evaluate_all_into(grid_.prepare(coordinates, policy), results);
   }
 
 private:

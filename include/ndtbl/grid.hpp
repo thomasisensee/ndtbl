@@ -179,9 +179,11 @@ public:
    * This is the key operation to reuse when several fields share a grid.
    *
    * @param coordinates Query coordinates in axis order.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
    * @return Prepared query containing corner indices and weights.
    */
-  PreparedQuery<Dim> prepare(const std::array<double, Dim>& coordinates) const
+  PreparedQuery<Dim> prepare(const std::array<double, Dim>& coordinates,
+                             bounds_policy policy = bounds_policy::clamp) const
   {
     std::array<std::size_t, Dim> lower_indices;
     std::array<std::size_t, Dim> upper_indices;
@@ -189,7 +191,7 @@ public:
 
     for (std::size_t axis = 0; axis < Dim; ++axis) {
       const std::pair<std::size_t, double> bracket =
-        axes_[axis].bracket(coordinates[axis]);
+        axes_[axis].bracket(coordinates[axis], policy);
       lower_indices[axis] = bracket.first;
       upper_indices[axis] =
         std::min(lower_indices[axis] + 1, extents_[axis] - 1);

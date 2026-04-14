@@ -122,14 +122,16 @@ public:
    * @brief Evaluate all stored fields at one coordinate tuple.
    *
    * @param coordinates Query coordinates in grid axis order.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
    * @return Interpolated field values converted to `double`.
    * @see evaluate_all_into
    */
   std::vector<double> evaluate_all(
-    const std::array<double, Dim>& coordinates) const
+    const std::array<double, Dim>& coordinates,
+    bounds_policy policy = bounds_policy::clamp) const
   {
     std::vector<double> values(field_count(), 0.0);
-    evaluate_all_into(coordinates, values.data());
+    evaluate_all_into(coordinates, values.data(), policy);
     return values;
   }
 
@@ -138,15 +140,17 @@ public:
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param values Output buffer with space for `field_count()` values.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
    * @see evaluate_all
    */
   void evaluate_all_into(const std::array<double, Dim>& coordinates,
-                         double* values) const
+                         double* values,
+                         bounds_policy policy = bounds_policy::clamp) const
   {
     if (!impl_) {
       throw std::runtime_error("ndtbl field group is empty");
     }
-    impl_->evaluate_all_into(coordinates, values);
+    impl_->evaluate_all_into(coordinates, values, policy);
   }
 
   /**
@@ -173,7 +177,8 @@ private:
     virtual std::array<Axis, Dim> axes() const = 0;
     virtual std::size_t field_index(const std::string& field_name) const = 0;
     virtual void evaluate_all_into(const std::array<double, Dim>& coordinates,
-                                   double* values) const = 0;
+                                   double* values,
+                                   bounds_policy policy) const = 0;
     virtual void write(std::ostream& os) const = 0;
   };
 
@@ -203,9 +208,10 @@ private:
     }
 
     void evaluate_all_into(const std::array<double, Dim>& coordinates,
-                           double* values) const override
+                           double* values,
+                           bounds_policy policy) const override
     {
-      group_.evaluate_all_into(coordinates, scratch_.data());
+      group_.evaluate_all_into(coordinates, scratch_.data(), policy);
       for (std::size_t field = 0; field < scratch_.size(); ++field) {
         values[field] = static_cast<double>(scratch_[field]);
       }

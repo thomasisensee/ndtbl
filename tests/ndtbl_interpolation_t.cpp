@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdio>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -207,6 +208,98 @@ TEST_CASE("field group clamps explicit-axis queries outside the domain",
 
   require_clamped_linear_recovery(axes, { -2.0, 6.0 });
   require_clamped_linear_recovery(axes, { -5.0, 8.0 });
+}
+
+TEST_CASE("single-point axes reject out-of-domain coordinates in throw mode",
+          "[axis][interpolation]")
+{
+  const ndtbl::Axis uniform = ndtbl::Axis::uniform(2.0, 10.0, 1);
+  REQUIRE_NOTHROW(uniform.bracket(2.0, ndtbl::bounds_policy::throw_error));
+  REQUIRE_THROWS_AS(uniform.bracket(2.1, ndtbl::bounds_policy::throw_error),
+                    std::out_of_range);
+
+  const ndtbl::Axis explicit_axis = ndtbl::Axis::from_coordinates({ 3.0 });
+  REQUIRE_NOTHROW(
+    explicit_axis.bracket(3.0, ndtbl::bounds_policy::throw_error));
+  REQUIRE_THROWS_AS(
+    explicit_axis.bracket(2.9, ndtbl::bounds_policy::throw_error),
+    std::out_of_range);
+}
+
+TEST_CASE("field group rejects uniform-axis queries outside the domain",
+          "[field_group][interpolation]")
+{
+  const std::array<ndtbl::Axis, 2> axes = {
+    ndtbl::Axis::uniform(-1.0, 2.0, 4),
+    ndtbl::Axis::uniform(0.0, 6.0, 4),
+  };
+  const ndtbl::FieldGroup<double, 2> group(
+    ndtbl::Grid<2>(axes),
+    { "A", "B" },
+    ndtbl_test::build_linear_payload(
+      axes, coefficients_a<2>(), 1.25, coefficients_b<2>(), -0.75));
+  std::array<double, 2> values = { 0.0, 0.0 };
+
+  REQUIRE_NOTHROW(
+    group.evaluate_all({ -1.0, 6.0 }, ndtbl::bounds_policy::throw_error));
+  REQUIRE_THROWS_AS(
+    group.evaluate_all({ -1.1, 3.0 }, ndtbl::bounds_policy::throw_error),
+    std::out_of_range);
+  REQUIRE_THROWS_AS(group.evaluate_all_into({ 0.0, 6.1 },
+                                            values.data(),
+                                            ndtbl::bounds_policy::throw_error),
+                    std::out_of_range);
+}
+
+TEST_CASE("field group rejects explicit-axis queries outside the domain",
+          "[field_group][interpolation]")
+{
+  const std::array<ndtbl::Axis, 2> axes = {
+    ndtbl::Axis::from_coordinates({ -2.0, -0.5, 1.0, 3.5 }),
+    ndtbl::Axis::from_coordinates({ 1.0, 1.75, 4.0, 6.0 }),
+  };
+  const ndtbl::FieldGroup<double, 2> group(
+    ndtbl::Grid<2>(axes),
+    { "A", "B" },
+    ndtbl_test::build_linear_payload(
+      axes, coefficients_a<2>(), 1.25, coefficients_b<2>(), -0.75));
+  std::array<double, 2> values = { 0.0, 0.0 };
+
+  REQUIRE_NOTHROW(
+    group.evaluate_all({ -2.0, 6.0 }, ndtbl::bounds_policy::throw_error));
+  REQUIRE_THROWS_AS(
+    group.evaluate_all({ -2.1, 3.0 }, ndtbl::bounds_policy::throw_error),
+    std::out_of_range);
+  REQUIRE_THROWS_AS(group.evaluate_all_into({ 0.0, 6.1 },
+                                            values.data(),
+                                            ndtbl::bounds_policy::throw_error),
+                    std::out_of_range);
+}
+
+TEST_CASE("runtime field group forwards throw bounds policy",
+          "[io][interpolation]")
+{
+  const std::array<ndtbl::Axis, 2> axes = {
+    ndtbl::Axis::uniform(-1.0, 2.0, 4),
+    ndtbl::Axis::uniform(0.0, 6.0, 4),
+  };
+  const ndtbl::FieldGroup<double, 2> group(
+    ndtbl::Grid<2>(axes),
+    { "A", "B" },
+    ndtbl_test::build_linear_payload(
+      axes, coefficients_a<2>(), 1.25, coefficients_b<2>(), -0.75));
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  const ndtbl::RuntimeFieldGroup<2> loaded = ndtbl::read_group<2>(path);
+  std::array<double, 2> values = { 0.0, 0.0 };
+  REQUIRE_NOTHROW(loaded.evaluate_all_into({ -2.0, 7.0 }, values.data()));
+  REQUIRE_THROWS_AS(loaded.evaluate_all_into({ -2.0, 7.0 },
+                                             values.data(),
+                                             ndtbl::bounds_policy::throw_error),
+                    std::out_of_range);
+
+  std::remove(path.c_str());
 }
 
 TEST_CASE("runtime field groups preserve exact interpolation on uniform axes",

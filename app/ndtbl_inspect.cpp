@@ -43,6 +43,8 @@ main(int argc, char** argv)
       ndtbl::read_group_metadata(input_path.string());
 
     std::cout << "file: " << input_path.string() << '\n';
+    std::cout << "format_version: "
+              << static_cast<unsigned>(metadata.format_version) << '\n';
     std::cout << "dimension: " << metadata.dimension << '\n';
     std::cout << "fields: " << metadata.field_count << '\n';
     std::cout << "value_type: " << value_type_name(metadata.value_type) << '\n';

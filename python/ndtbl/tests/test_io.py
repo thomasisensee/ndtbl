@@ -54,6 +54,7 @@ def test_read_metadata_returns_expected_summary(
 
     metadata = read_metadata(path)
 
+    assert metadata.format_version == 1
     assert metadata.dimension == 2
     assert metadata.field_count == 2
     assert metadata.axis_sizes == (2, 3)
@@ -154,7 +155,7 @@ def test_write_group_uses_expected_little_endian_layout(tmp_path) -> None:
 
     expected = b"".join(
         (
-            b"NDTBL1\0\0",
+            b"NDTBL\0\0\0",
             struct.pack("<B", 1),
             struct.pack("<B", 1),
             struct.pack("<H", 0),

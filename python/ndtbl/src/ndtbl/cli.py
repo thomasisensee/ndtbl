@@ -68,6 +68,7 @@ def _echo_metadata(path: Path, metadata: GroupMetadata) -> None:
     """
 
     click.echo(f"file: {path}")
+    click.echo(f"format_version: {metadata.format_version}")
     click.echo(f"dimension: {metadata.dimension}")
     click.echo(f"fields: {metadata.field_count}")
     click.echo(f"points: {metadata.point_count}")

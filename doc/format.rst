@@ -16,7 +16,7 @@ Header
 
 Each file begins with this fixed header:
 
-* ``magic[8]``: ``"NDTBL1\0\0"``
+* ``magic[8]``: ``"NDTBL\0\0\0"``
 * ``version:u8``: currently ``1``
 * ``scalar_type:u8``: ``1=float32``, ``2=float64``
 * ``reserved:u16``: must be zero

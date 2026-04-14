@@ -13,7 +13,7 @@ from .model import (
     UniformAxis,
 )
 
-MAGIC = b"NDTBL1\0\0"
+MAGIC = b"NDTBL\0\0\0"
 VERSION = 1
 
 AXIS_KIND_UNIFORM = 1
@@ -201,7 +201,12 @@ def _read_layout_from_stream(stream: BinaryIO) -> ParsedLayout:
     axes = tuple(_read_axis(stream) for _ in range(dimension))
     field_names = tuple(_read_string(stream) for _ in range(field_count))
 
-    metadata = GroupMetadata(axes=axes, field_names=field_names, dtype=dtype)
+    metadata = GroupMetadata(
+        axes=axes,
+        field_names=field_names,
+        dtype=dtype,
+        format_version=version,
+    )
     if metadata.point_count != point_count:
         raise NdtblFormatError("ndtbl point count does not match axis extents")
 

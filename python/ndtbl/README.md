@@ -45,16 +45,15 @@ python -m pip install -v -e .[lint,tests]
 
 ## 🐍 Python API
 
-The core API revolves around `FieldGroup`, `UniformAxis`, `read_group`, and
-`write_group`.
+The core API revolves around `FieldGroup`, `UniformAxis`, `ExplicitAxis`, `read_group`, and `write_group`.
 
 ```python
 import numpy as np
 
-from ndtbl import FieldGroup, UniformAxis, read_group, write_group
+from ndtbl import FieldGroup, UniformAxis, ExplicitAxis, read_group, write_group
 
 group = FieldGroup(
-    axes=(UniformAxis(0.0, 1.0, 3), UniformAxis(10.0, 20.0, 2)),
+    axes=(ExplicitAxis([0.0, 0.1, 1.0]), UniformAxis(10.0, 20.0, 2)),
     field_names=("A", "B"),
     values=np.array(
         [
@@ -74,6 +73,10 @@ print(loaded.values[1, 0, :])
 ```
 
 The `values` array shape is `axis_0 x axis_1 x ... x field`.
+
+### Demo notebook
+Use the [demo notebook](https://github.com/thomasisensee/ndtbl/blob/pyproject/python/ndtbl/notebooks/demo.ipynb) to test the Python functionality of `ndtbl` and see how it can be used to read and write binary `.ndtbl` files.
+
 
 ## 💻 CLI
 

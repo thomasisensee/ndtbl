@@ -112,3 +112,6 @@ venv.bak/
 
 # ndtbl binary files
 *.ndtbl
+
+# Jupyter Notebook
+.ipynb_checkpoints

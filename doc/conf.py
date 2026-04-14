@@ -6,6 +6,7 @@
 
 import os
 import subprocess
+import sys
 
 # -- Path setup --------------------------------------------------------------
 
@@ -13,8 +14,11 @@ import subprocess
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+doc_dir = os.path.abspath(os.path.dirname(__file__))
+python_package_src = os.path.abspath(
+    os.path.join(doc_dir, "..", "python", "ndtbl", "src")
+)
+sys.path.insert(0, python_package_src)
 
 
 # -- Project information -----------------------------------------------------

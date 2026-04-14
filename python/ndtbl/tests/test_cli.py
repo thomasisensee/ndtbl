@@ -17,6 +17,7 @@ def test_inspect_prints_key_metadata_and_default_samples(
     assert result.exit_code == 0
     assert f"{_INSPECT_BANNER}\n\nfile: {path}" in result.output
     assert f"file: {path}" in result.output
+    assert "format_version: 1" in result.output
     assert "dimension: 2" in result.output
     assert "fields: 2" in result.output
     assert "points: 6" in result.output

@@ -26,6 +26,7 @@ TEST_CASE("typed loader round-trips metadata and float payloads", "[io]")
   ndtbl::write_group(path, group);
 
   const ndtbl::GroupMetadata metadata = ndtbl::read_group_metadata(path);
+  REQUIRE(metadata.format_version == 1u);
   REQUIRE(metadata.dimension == 2);
   REQUIRE(metadata.field_count == 2);
   REQUIRE(metadata.point_count == 4);
@@ -119,7 +120,8 @@ TEST_CASE("writer produces the documented little-endian layout", "[io]")
   ndtbl::write_group(path, group);
 
   std::vector<char> expected;
-  expected.insert(expected.end(), { 'N', 'D', 'T', 'B', 'L', '1', '\0', '\0' });
+  expected.insert(expected.end(),
+                  { 'N', 'D', 'T', 'B', 'L', '\0', '\0', '\0' });
   ndtbl_test::append_uint_le<std::uint8_t>(expected, 1u);
   ndtbl_test::append_uint_le<std::uint8_t>(expected, 1u);
   ndtbl_test::append_uint_le<std::uint16_t>(expected, 0u);

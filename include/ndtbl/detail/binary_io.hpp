@@ -25,7 +25,7 @@ namespace detail {
  * This constant is part of the binary file format implementation and is not
  * intended to be consumed directly by library users.
  */
-static const char file_magic[8] = { 'N', 'D', 'T', 'B', 'L', '1', '\0', '\0' };
+static const char file_magic[8] = { 'N', 'D', 'T', 'B', 'L', '\0', '\0', '\0' };
 
 /**
  * @brief Write one exact byte sequence to a binary stream.
@@ -418,6 +418,7 @@ read_group_layout_impl(std::istream& is)
   }
 
   GroupMetadata metadata;
+  metadata.format_version = version;
   metadata.value_type =
     static_cast<scalar_type>(read_uint_le<std::uint8_t>(is));
   require_zero(read_uint_le<std::uint16_t>(is), "header reserved field");

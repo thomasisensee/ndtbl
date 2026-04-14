@@ -4,6 +4,7 @@
 #include "ndtbl/types.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,8 @@ struct GroupMetadata
   std::vector<Axis> axes;
   /// Field names in payload storage order.
   std::vector<std::string> field_names;
+  /// ndtbl binary file format version.
+  std::uint8_t format_version = 1u;
 };
 
 } // namespace ndtbl

@@ -199,11 +199,13 @@ class GroupMetadata:
         axes: Axes that define the table dimensions.
         field_names: Names of the stored fields.
         dtype: Payload scalar dtype, limited to float32 or float64.
+        format_version: ndtbl binary file format version.
     """
 
     axes: tuple[Axis, ...]
     field_names: tuple[str, ...]
     dtype: np.dtype[np.float32] | np.dtype[np.float64]
+    format_version: int = 1
 
     def __post_init__(self) -> None:
         """Normalize metadata fields after dataclass initialization."""
@@ -212,6 +214,7 @@ class GroupMetadata:
             self, "field_names", _normalize_field_names(self.field_names)
         )
         object.__setattr__(self, "dtype", normalize_dtype(self.dtype))
+        object.__setattr__(self, "format_version", int(self.format_version))
 
     @property
     def dimension(self) -> int:

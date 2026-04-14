@@ -1,11 +1,10 @@
 #include "ndtbl/ndtbl.hpp"
 
+#include <exception>
 #include <filesystem>
 #include <iostream>
-#include <stdexcept>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace {
 

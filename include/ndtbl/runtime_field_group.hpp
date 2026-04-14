@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ndtbl/field_group.hpp"
-#include "ndtbl/metadata.hpp"
 #include "ndtbl/types.hpp"
 
 #include <array>

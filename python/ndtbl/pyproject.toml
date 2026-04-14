@@ -45,6 +45,10 @@ lint = [
     "mypy",
     "ruff",
 ]
+notebooks = [
+    "jupyterlab",
+    "matplotlib",
+]
 tests = [
     "pytest",
     "pytest-cov",

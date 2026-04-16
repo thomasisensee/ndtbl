@@ -119,38 +119,82 @@ public:
   }
 
   /**
-   * @brief Evaluate all stored fields at one coordinate tuple.
+   * @brief Evaluate all stored fields at one coordinate tuple using multilinear
+   * interpolation.
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
    * @return Interpolated field values converted to `double`.
-   * @see evaluate_all_into
+   * @see evaluate_all_linear_into
    */
-  std::vector<double> evaluate_all(
+  std::vector<double> evaluate_all_linear(
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
     std::vector<double> values(field_count(), 0.0);
-    evaluate_all_into(coordinates, values.data(), policy);
+    evaluate_all_linear_into(coordinates, values.data(), policy);
     return values;
   }
 
   /**
-   * @brief Evaluate all stored fields into caller-provided output storage.
+   * @brief Evaluate all stored fields using multilinear interpolation into
+   * caller-provided output storage.
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param values Output buffer with space for `field_count()` values.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
-   * @see evaluate_all
+   * @see evaluate_all_linear
    */
-  void evaluate_all_into(const std::array<double, Dim>& coordinates,
-                         double* values,
-                         bounds_policy policy = bounds_policy::clamp) const
+  void evaluate_all_linear_into(
+    const std::array<double, Dim>& coordinates,
+    double* values,
+    bounds_policy policy = bounds_policy::clamp) const
   {
     if (!impl_) {
       throw std::runtime_error("ndtbl field group is empty");
     }
-    impl_->evaluate_all_into(coordinates, values, policy);
+    impl_->evaluate_all_linear_into(coordinates, values, policy);
+  }
+
+  /**
+   * @brief Evaluate all stored fields at one coordinate tuple using local cubic
+   * interpolation.
+   *
+   * Cubic interpolation is an explicit opt-in because it uses `4^Dim` table
+   * values and can overshoot.
+   *
+   * @param coordinates Query coordinates in grid axis order.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
+   * @return Cubically interpolated field values converted to `double`.
+   * @see evaluate_all_cubic_into
+   */
+  std::vector<double> evaluate_all_cubic(
+    const std::array<double, Dim>& coordinates,
+    bounds_policy policy = bounds_policy::clamp) const
+  {
+    std::vector<double> values(field_count(), 0.0);
+    evaluate_all_cubic_into(coordinates, values.data(), policy);
+    return values;
+  }
+
+  /**
+   * @brief Evaluate all stored fields using local cubic interpolation into
+   * caller-provided output storage.
+   *
+   * @param coordinates Query coordinates in grid axis order.
+   * @param values Output buffer with space for `field_count()` values.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
+   * @see evaluate_all_cubic
+   */
+  void evaluate_all_cubic_into(
+    const std::array<double, Dim>& coordinates,
+    double* values,
+    bounds_policy policy = bounds_policy::clamp) const
+  {
+    if (!impl_) {
+      throw std::runtime_error("ndtbl field group is empty");
+    }
+    impl_->evaluate_all_cubic_into(coordinates, values, policy);
   }
 
   /**
@@ -176,9 +220,14 @@ private:
     virtual std::vector<std::string> field_names() const = 0;
     virtual std::array<Axis, Dim> axes() const = 0;
     virtual std::size_t field_index(const std::string& field_name) const = 0;
-    virtual void evaluate_all_into(const std::array<double, Dim>& coordinates,
-                                   double* values,
-                                   bounds_policy policy) const = 0;
+    virtual void evaluate_all_linear_into(
+      const std::array<double, Dim>& coordinates,
+      double* values,
+      bounds_policy policy) const = 0;
+    virtual void evaluate_all_cubic_into(
+      const std::array<double, Dim>& coordinates,
+      double* values,
+      bounds_policy policy) const = 0;
     virtual void write(std::ostream& os) const = 0;
   };
 
@@ -207,11 +256,21 @@ private:
       return group_.field_index(field_name);
     }
 
-    void evaluate_all_into(const std::array<double, Dim>& coordinates,
-                           double* values,
-                           bounds_policy policy) const override
+    void evaluate_all_linear_into(const std::array<double, Dim>& coordinates,
+                                  double* values,
+                                  bounds_policy policy) const override
     {
-      group_.evaluate_all_into(coordinates, scratch_.data(), policy);
+      group_.evaluate_all_linear_into(coordinates, scratch_.data(), policy);
+      for (std::size_t field = 0; field < scratch_.size(); ++field) {
+        values[field] = static_cast<double>(scratch_[field]);
+      }
+    }
+
+    void evaluate_all_cubic_into(const std::array<double, Dim>& coordinates,
+                                 double* values,
+                                 bounds_policy policy) const override
+    {
+      group_.evaluate_all_cubic_into(coordinates, scratch_.data(), policy);
       for (std::size_t field = 0; field < scratch_.size(); ++field) {
         values[field] = static_cast<double>(scratch_[field]);
       }

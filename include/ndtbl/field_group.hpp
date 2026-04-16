@@ -18,10 +18,9 @@ namespace ndtbl {
  * memory.
  *
  * The storage layout is point-major in row-major grid order:
- * `point0.field0, point0.field1, ..., point1.field0, ...`
- * where the last grid axis varies fastest before stepping to the next field
- * tuple.
- * so that one prepared interpolation query can accumulate all fields together.
+ * `point0.field0, point0.field1, ..., point1.field0, ...` where the last grid
+ * axis varies fastest before stepping to the next field tuple. One prepared
+ * interpolation stencil can accumulate all fields together.
  */
 template<class Value, std::size_t Dim>
 class FieldGroup
@@ -137,15 +136,18 @@ public:
    * @brief Evaluate all fields using a previously prepared interpolation
    * stencil.
    *
-   * @param prepared Prepared query to reuse across fields.
+   * @tparam Stencil Fixed-size interpolation stencil type.
+   * @param stencil Prepared stencil to reuse across fields.
    * @return Interpolated field values in storage order.
-   * @see Grid::prepare
-   * @see evaluate_all(const std::array<double, Dim>&)
+   * @see Grid::prepare_linear
+   * @see Grid::prepare_cubic
+   * @see evaluate_all_linear(const std::array<double, Dim>&)
    */
-  std::vector<Value> evaluate_all(const PreparedQuery<Dim>& prepared) const
+  template<class Stencil>
+  std::vector<Value> evaluate_all(const Stencil& stencil) const
   {
     std::vector<Value> results(field_count(), Value(0));
-    evaluate_all_into(prepared, results.data());
+    evaluate_all_into(stencil, results.data());
     return results;
   }
 
@@ -153,18 +155,18 @@ public:
    * @brief Evaluate all fields using a previously prepared interpolation
    * stencil into caller-provided storage.
    *
-   * @param prepared Prepared query to reuse across fields.
+   * @tparam Stencil Fixed-size interpolation stencil type.
+   * @param stencil Prepared stencil to reuse across fields.
    * @param results Output buffer with space for `field_count()` values.
-   * @see evaluate_all(const PreparedQuery<Dim>&)
+   * @see evaluate_all(const Stencil&)
    */
-  void evaluate_all_into(const PreparedQuery<Dim>& prepared,
-                         Value* results) const
+  template<class Stencil>
+  void evaluate_all_into(const Stencil& stencil, Value* results) const
   {
     std::fill(results, results + field_count(), Value(0));
-    for (std::size_t corner = 0; corner < PreparedQuery<Dim>::corners;
-         ++corner) {
-      const double weight = prepared.weight(corner);
-      const std::size_t base = prepared.point_index(corner) * field_count();
+    for (std::size_t point = 0; point < Stencil::points; ++point) {
+      const double weight = stencil.weight(point);
+      const std::size_t base = stencil.point_index(point) * field_count();
       for (std::size_t field = 0; field < field_count(); ++field) {
         results[field] +=
           static_cast<Value>(weight * interleaved_values_[base + field]);
@@ -173,34 +175,73 @@ public:
   }
 
   /**
-   * @brief Evaluate all fields directly from query coordinates.
+   * @brief Evaluate all fields directly from query coordinates using
+   * multilinear interpolation.
    *
    * @param coordinates Query coordinates in grid axis order.
    * @return Interpolated field values in storage order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
-   * @see evaluate_all(const PreparedQuery<Dim>&)
+   * @see evaluate_all(const Stencil&)
    */
-  std::vector<Value> evaluate_all(
+  std::vector<Value> evaluate_all_linear(
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
-    return evaluate_all(grid_.prepare(coordinates, policy));
+    return evaluate_all(grid_.prepare_linear(coordinates, policy));
   }
 
   /**
-   * @brief Evaluate all fields directly from query coordinates into
-   * caller-provided storage.
+   * @brief Evaluate all fields directly from query coordinates using
+   * multilinear interpolation into caller-provided storage.
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param results Output buffer with space for `field_count()` values.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
-   * @see evaluate_all_into(const PreparedQuery<Dim>&, Value*)
+   * @see evaluate_all_into(const Stencil&, Value*)
    */
-  void evaluate_all_into(const std::array<double, Dim>& coordinates,
-                         Value* results,
-                         bounds_policy policy = bounds_policy::clamp) const
+  void evaluate_all_linear_into(
+    const std::array<double, Dim>& coordinates,
+    Value* results,
+    bounds_policy policy = bounds_policy::clamp) const
   {
-    evaluate_all_into(grid_.prepare(coordinates, policy), results);
+    evaluate_all_into(grid_.prepare_linear(coordinates, policy), results);
+  }
+
+  /**
+   * @brief Evaluate all fields directly from query coordinates using local
+   * cubic interpolation.
+   *
+   * Cubic interpolation uses four support points per axis and is therefore
+   * intended for experiments where the additional cost and possible overshoot
+   * are acceptable.
+   *
+   * @param coordinates Query coordinates in grid axis order.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
+   * @return Cubically interpolated field values in storage order.
+   * @see Grid::prepare_cubic
+   */
+  std::vector<Value> evaluate_all_cubic(
+    const std::array<double, Dim>& coordinates,
+    bounds_policy policy = bounds_policy::clamp) const
+  {
+    return evaluate_all(grid_.prepare_cubic(coordinates, policy));
+  }
+
+  /**
+   * @brief Evaluate all fields directly from query coordinates using local
+   * cubic interpolation into caller-provided storage.
+   *
+   * @param coordinates Query coordinates in grid axis order.
+   * @param results Output buffer with space for `field_count()` values.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
+   * @see evaluate_all_cubic
+   */
+  void evaluate_all_cubic_into(
+    const std::array<double, Dim>& coordinates,
+    Value* results,
+    bounds_policy policy = bounds_policy::clamp) const
+  {
+    evaluate_all_into(grid_.prepare_cubic(coordinates, policy), results);
   }
 
 private:

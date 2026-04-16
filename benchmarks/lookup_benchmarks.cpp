@@ -53,7 +53,7 @@ struct LookupContext
   ndtbl::FieldGroup<double, Dim> group;
   ndtbl::RuntimeFieldGroup<Dim> runtime_group;
   std::vector<std::array<double, Dim>> queries;
-  ndtbl::PreparedQuery<Dim> prepared;
+  ndtbl::LinearStencil<Dim> prepared;
 
   LookupContext(const ndtbl::Grid<Dim>& grid_in,
                 const ndtbl::FieldGroup<double, Dim>& group_in,
@@ -62,7 +62,7 @@ struct LookupContext
     , group(group_in)
     , runtime_group(group)
     , queries(queries_in)
-    , prepared(grid.prepare(queries.front()))
+    , prepared(grid.prepare_linear(queries.front()))
   {
   }
 };
@@ -287,7 +287,7 @@ context(std::size_t extent, ndtbl::axis_kind axis_kind, std::size_t field_count)
 /**
  * @brief Benchmark axis bracketing and interpolation-stencil preparation.
  *
- * Measures `Grid::prepare(query)` only.
+ * Measures `Grid::prepare_linear(query)` only.
  *
  * @tparam Dim Benchmark dimensionality.
  * @param state Google Benchmark state.
@@ -305,7 +305,8 @@ bench_prepare(benchmark::State& state,
   std::size_t query = 0;
 
   for (auto _ : state) {
-    ndtbl::PreparedQuery<Dim> prepared = data.grid.prepare(data.queries[query]);
+    ndtbl::LinearStencil<Dim> prepared =
+      data.grid.prepare_linear(data.queries[query]);
     benchmark::DoNotOptimize(prepared);
     query = (query + 1) % data.queries.size();
   }
@@ -342,8 +343,8 @@ bench_prepared_evaluate(benchmark::State& state,
 /**
  * @brief Benchmark typed end-to-end lookup from query coordinates.
  *
- * Measures `FieldGroup::evaluate_all_into(query, results)`, including stencil
- * preparation and interpolation.
+ * Measures `FieldGroup::evaluate_all_linear_into(query, results)`, including
+ * stencil preparation and interpolation.
  *
  * @tparam Dim Benchmark dimensionality.
  * @param state Google Benchmark state.
@@ -363,7 +364,7 @@ bench_typed_combined(benchmark::State& state,
   std::size_t query = 0;
 
   for (auto _ : state) {
-    data.group.evaluate_all_into(data.queries[query], results.data());
+    data.group.evaluate_all_linear_into(data.queries[query], results.data());
     benchmark::DoNotOptimize(results.data());
     benchmark::ClobberMemory();
     query = (query + 1) % data.queries.size();
@@ -373,8 +374,8 @@ bench_typed_combined(benchmark::State& state,
 /**
  * @brief Benchmark runtime-erased end-to-end lookup from query coordinates.
  *
- * Measures `RuntimeFieldGroup::evaluate_all_into(query, results)`, including
- * wrapper dispatch and scratch-buffer handling.
+ * Measures `RuntimeFieldGroup::evaluate_all_linear_into(query, results)`,
+ * including wrapper dispatch and scratch-buffer handling.
  *
  * @tparam Dim Benchmark dimensionality.
  * @param state Google Benchmark state.
@@ -394,7 +395,8 @@ bench_runtime_combined(benchmark::State& state,
   std::size_t query = 0;
 
   for (auto _ : state) {
-    data.runtime_group.evaluate_all_into(data.queries[query], results.data());
+    data.runtime_group.evaluate_all_linear_into(data.queries[query],
+                                                results.data());
     benchmark::DoNotOptimize(results.data());
     benchmark::ClobberMemory();
     query = (query + 1) % data.queries.size();

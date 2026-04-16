@@ -29,8 +29,9 @@ available, CMake falls back to `FetchContent`.
 
 ## Test Files
 
-- `ndtbl_interpolation_t.cpp` checks interpolation behavior for typed
-  `FieldGroup` objects and runtime-erased `RuntimeFieldGroup` objects.
+- `ndtbl_interpolation_t.cpp` checks linear and experimental cubic
+  interpolation behavior for typed `FieldGroup` objects and runtime-erased
+  `RuntimeFieldGroup` objects.
 - `ndtbl_io_t.cpp` checks binary read/write behavior, metadata handling, and
   rejection of malformed files.
 - `test_support.hpp` provides shared helpers for temporary files, byte-level
@@ -39,18 +40,20 @@ available, CMake falls back to `FetchContent`.
 ## What Is Covered
 
 - Exact recovery of synthetic linear fields on uniform and explicit axes.
+- Exact recovery of synthetic cubic fields on uniform and explicit axes.
 - 2D and 4D interpolation cases.
 - Vertex queries on support points.
 - Clamp and throw-error bounds policies for out-of-domain coordinates.
 - Runtime-erased lookup through `RuntimeFieldGroup`.
+- Compile-time stencil sizes for 4D linear and cubic interpolation.
 - Round trips through `write_group`, `read_group`, and `read_group_metadata`.
 - Little-endian binary layout for a small documented file.
 - Rejection of mismatched dimensions, truncated payloads, invalid reserved
   fields, and inconsistent payload offsets.
 
-The interpolation tests use linear fields because linear interpolation should
-recover them exactly. This makes correctness failures easier to interpret than
-using arbitrary tabulated data.
+The interpolation tests use polynomial fields because linear and cubic
+interpolation should recover matching low-order polynomials exactly. This makes
+correctness failures easier to interpret than using arbitrary tabulated data.
 
 ## Not Currently Covered
 

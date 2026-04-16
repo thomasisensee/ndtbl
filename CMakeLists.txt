@@ -10,15 +10,12 @@ project(ndtbl
 include(GNUInstallDirs)
 
 # Define build options
-option(ndtbl_BUILD_TESTING "Enable building of tests" OFF)
 option(ndtbl_BUILD_BENCHMARKS "Enable building of benchmarks" OFF)
-option(ndtbl_ENABLE_MMAP "Enable POSIX mmap-backed ndtbl payload reads" OFF)
+option(ndtbl_BUILD_DOCS "Enable building of documentation" OFF)
+option(ndtbl_BUILD_TESTING "Enable building of tests" OFF)
 
-if(PROJECT_IS_TOP_LEVEL)
-  option(ndtbl_BUILD_DOCS "Enable building of documentation" ON)
-else()
-  option(ndtbl_BUILD_DOCS "Enable building of documentation" OFF)
-endif()
+# Option for enabling POSIX mmap support for payload reads
+option(ndtbl_ENABLE_MMAP "Enable POSIX mmap-backed ndtbl payload reads" OFF)
 
 if(ndtbl_ENABLE_MMAP AND NOT UNIX)
   message(FATAL_ERROR "ndtbl_ENABLE_MMAP requires a POSIX platform")
@@ -58,27 +55,25 @@ target_compile_features(ndtbl
     cxx_std_14
 )
 
+# Compile the application executable
 if(PROJECT_IS_TOP_LEVEL)
-  # Compile the application executable
   add_subdirectory(app)
 endif()
 
-if(PROJECT_IS_TOP_LEVEL)
-  # Compile the tests
-  include(CTest)
-  if(ndtbl_BUILD_TESTING)
-    add_subdirectory(tests)
-  endif()
-endif()
-
 # Compile the benchmarks
-if(PROJECT_IS_TOP_LEVEL AND ndtbl_BUILD_BENCHMARKS)
+if(ndtbl_BUILD_BENCHMARKS)
   add_subdirectory(benchmarks)
 endif()
 
 # Add the documentation
-if(PROJECT_IS_TOP_LEVEL AND ndtbl_BUILD_DOCS)
+if(ndtbl_BUILD_DOCS)
   add_subdirectory(doc)
+endif()
+
+# Compile the tests
+if(ndtbl_BUILD_TESTING)
+  include(CTest)
+  add_subdirectory(tests)
 endif()
 
 # Add an alias target for use if this project is included as a subproject in another project

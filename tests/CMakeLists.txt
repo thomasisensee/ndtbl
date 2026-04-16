@@ -1,14 +1,17 @@
-# Enable CMake's FetchContent module, which allows downloading dependencies like Catch2 automatically at configure time.
-include(FetchContent)
+# Prefer an installed or parent-provided Catch2 package, and only fetch it as
+# a fallback when the test dependency is not available yet.
+find_package(Catch2 3 QUIET)
 
-# Declare a dependency on Catch2 via FetchContent. This will clone the Catch2 GitHub repository during configuration.
-FetchContent_Declare(
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG v3.13.0)
+if(NOT TARGET Catch2::Catch2WithMain)
+  include(FetchContent)
 
-# Make Catch2 available in this project. This defines the imported targets Catch2::Catch2 and Catch2::Catch2WithMain.
-FetchContent_MakeAvailable(Catch2)
+  FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.13.0)
+
+  FetchContent_MakeAvailable(Catch2)
+endif()
 
 # Include Catch2's CMake helper functions (e.g., catch_discover_tests).
 include(Catch)

@@ -372,6 +372,37 @@ bench_typed_combined(benchmark::State& state,
 }
 
 /**
+ * @brief Benchmark typed end-to-end cubic lookup from query coordinates.
+ *
+ * Measures `FieldGroup::evaluate_all_cubic_into(query, results)`, including
+ * cubic stencil preparation and interpolation.
+ *
+ * @tparam Dim Benchmark dimensionality.
+ * @param state Google Benchmark state.
+ * @param extent Number of support points per axis.
+ * @param axis_kind Axis representation to benchmark.
+ * @param field_count Number of fields to evaluate at each lookup.
+ */
+template<std::size_t Dim>
+void
+bench_typed_cubic_combined(benchmark::State& state,
+                           std::size_t extent,
+                           ndtbl::axis_kind axis_kind,
+                           std::size_t field_count)
+{
+  const LookupContext<Dim>& data = context<Dim>(extent, axis_kind, field_count);
+  std::vector<double> results(data.group.field_count(), 0.0);
+  std::size_t query = 0;
+
+  for (auto _ : state) {
+    data.group.evaluate_all_cubic_into(data.queries[query], results.data());
+    benchmark::DoNotOptimize(results.data());
+    benchmark::ClobberMemory();
+    query = (query + 1) % data.queries.size();
+  }
+}
+
+/**
  * @brief Benchmark runtime-erased end-to-end lookup from query coordinates.
  *
  * Measures `RuntimeFieldGroup::evaluate_all_linear_into(query, results)`,
@@ -442,6 +473,11 @@ NDTBL_REGISTER_LOOKUP_BENCHMARKS(4,
                                  default_extent<4>(),
                                  ndtbl::axis_kind::uniform,
                                  d4_uniform);
+BENCHMARK_CAPTURE(bench_typed_cubic_combined<4>,
+                  d4_uniform_fields_4_cubic_combined,
+                  default_extent<4>(),
+                  ndtbl::axis_kind::uniform,
+                  4);
 NDTBL_REGISTER_LOOKUP_BENCHMARKS(4,
                                  default_extent<4>(),
                                  ndtbl::axis_kind::explicit_coordinates,

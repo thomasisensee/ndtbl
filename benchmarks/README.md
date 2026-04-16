@@ -48,6 +48,12 @@ registered with `2`, `4`, and `8` fields.
 runtime-erased path, including its wrapper dispatch and scratch-buffer copy. It
 is registered with `2`, `4`, and `8` fields.
 
+`bench_typed_cubic_combined` measures one focused cubic case:
+`FieldGroup::evaluate_all_cubic_into(query, results)` for a 4D uniform table
+with `4` fields. Cubic interpolation uses `4^Dim` table points, so a 4D case
+already exercises the important 256-point stencil cost. The suite intentionally
+does not expand cubic across every dimension, axis layout, or field count.
+
 ## Build And Run
 
 Configure and build the benchmark target:

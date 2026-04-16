@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23)
 
-# Set a name and a version number for your project:
+# Set a name and a version number for the project:
 project(ndtbl
   VERSION 0.0.1
   LANGUAGES CXX
@@ -46,6 +46,7 @@ target_sources(ndtbl
       include/ndtbl/detail/mapped_payload.hpp
 )
 
+# Compile flag for enabling mmap support
 target_compile_definitions(ndtbl
   INTERFACE
     NDTBL_ENABLE_MMAP=$<BOOL:${ndtbl_ENABLE_MMAP}>
@@ -70,6 +71,7 @@ if(PROJECT_IS_TOP_LEVEL)
   endif()
 endif()
 
+# Compile the benchmarks
 if(PROJECT_IS_TOP_LEVEL AND ndtbl_BUILD_BENCHMARKS)
   add_subdirectory(benchmarks)
 endif()

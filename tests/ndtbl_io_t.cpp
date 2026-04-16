@@ -35,7 +35,7 @@ TEST_CASE("typed loader round-trips metadata and float payloads", "[io]")
 
   const ndtbl::RuntimeFieldGroup<2> loaded = ndtbl::read_group<2>(path);
   std::array<double, 2> values = { 0.0, 0.0 };
-  loaded.evaluate_all_into({ 0.5, 0.5 }, values.data());
+  loaded.evaluate_all_linear_into({ 0.5, 0.5 }, values.data());
   REQUIRE(values[0] == Catch::Approx(1.5));
   REQUIRE(values[1] == Catch::Approx(11.5));
 
@@ -63,7 +63,7 @@ TEST_CASE("runtime field group can be rewritten after reading", "[io]")
   const ndtbl::RuntimeFieldGroup<2> rewritten =
     ndtbl::read_group<2>(output_path);
   std::array<double, 2> values = { 0.0, 0.0 };
-  rewritten.evaluate_all_into({ 0.5, 0.5 }, values.data());
+  rewritten.evaluate_all_linear_into({ 0.5, 0.5 }, values.data());
   REQUIRE(values[0] == Catch::Approx(1.5));
   REQUIRE(values[1] == Catch::Approx(11.5));
 

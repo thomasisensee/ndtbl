@@ -108,6 +108,20 @@ available before `cmake --build build`.
 When `ndtbl_ENABLE_MMAP=ON`, the C++ `read_group()` path uses read-only memory
 mapping on supported POSIX platforms.
 
+## 📐 Interpolation
+
+The standard C++ lookup path uses multilinear interpolation through explicit
+`evaluate_all_linear()` and `Grid::prepare_linear()` calls. This path uses
+`2^Dim` table points per query and keeps the hot path allocation-free.
+
+The C++ API also exposes experimental local tensor-product cubic interpolation
+through explicit `evaluate_all_cubic()` and `Grid::prepare_cubic()` calls. Cubic
+interpolation uses `4^Dim` table points, can be much more expensive in high
+dimensions, and may overshoot smooth-looking table data enough to produce
+unwanted values. Bounds handling is independent of interpolation order:
+queries outside the table domain can either clamp or throw according to the
+selected `bounds_policy`.
+
 ## 🐍 Python Package
 
 The repository also ships a separate Python package in `python/ndtbl/`.

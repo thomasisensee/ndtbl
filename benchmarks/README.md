@@ -28,7 +28,7 @@ the next precomputed query modulo the ring size.
 
 ## Measured Operations
 
-`bench_prepare` measures only `Grid::prepare(query)`. This isolates axis
+`bench_prepare` measures only `Grid::prepare_linear(query)`. This isolates axis
 bracketing and interpolation-stencil construction. It is registered once per
 dimension and axis layout because field count does not affect stencil
 preparation.
@@ -39,14 +39,20 @@ stencil and isolates interpolation over all fields. It is registered with `2`,
 `4`, and `8` fields.
 
 `bench_typed_combined` measures
-`FieldGroup::evaluate_all_into(query, results)`. This is the typed end-to-end
-path from query coordinates to interpolated field values. It is registered with
-`2`, `4`, and `8` fields.
+`FieldGroup::evaluate_all_linear_into(query, results)`. This is the typed
+end-to-end path from query coordinates to interpolated field values. It is
+registered with `2`, `4`, and `8` fields.
 
 `bench_runtime_combined` measures
-`RuntimeFieldGroup::evaluate_all_into(query, results)`. This covers the
+`RuntimeFieldGroup::evaluate_all_linear_into(query, results)`. This covers the
 runtime-erased path, including its wrapper dispatch and scratch-buffer copy. It
 is registered with `2`, `4`, and `8` fields.
+
+`bench_typed_cubic_combined` measures one focused cubic case:
+`FieldGroup::evaluate_all_cubic_into(query, results)` for a 4D uniform table
+with `4` fields. Cubic interpolation uses `4^Dim` table points, so a 4D case
+already exercises the important 256-point stencil cost. The suite intentionally
+does not expand cubic across every dimension, axis layout, or field count.
 
 ## Build And Run
 

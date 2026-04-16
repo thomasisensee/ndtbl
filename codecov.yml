@@ -8,11 +8,11 @@ coverage:
   status:
     project:
       cpp:
-        target: auto
+        target: 90
         flags:
           - cpp
       python:
-        target: auto
+        target: 90
         flags:
           - python
 

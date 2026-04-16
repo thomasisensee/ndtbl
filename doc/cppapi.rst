@@ -12,8 +12,12 @@ API reference
 .. doxygenclass:: ndtbl::Grid
    :members:
 
-.. doxygenclass:: ndtbl::PreparedQuery
+.. doxygenclass:: ndtbl::TensorStencil
    :members:
+
+.. doxygentypedef:: ndtbl::LinearStencil
+
+.. doxygentypedef:: ndtbl::CubicStencil
 
 .. doxygenclass:: ndtbl::FieldGroup
    :members:

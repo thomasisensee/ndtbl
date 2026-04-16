@@ -22,10 +22,11 @@ can stay file-backed instead of always being copied into heap memory.
 ## 🗂️ Layout
 
 - `include/ndtbl/`: public C++ headers
-- `app/`: C++ command-line tools built by CMake
-- `tests/`: Catch2-based C++ test suite
+- `app/`: C++ command-line tool for inspecting `.ndtbl` files
+- `benchmarks/`: C++ benchmarks
 - `doc/`: Sphinx and Doxygen documentation
 - `python/ndtbl/`: pure-Python package and `ndtbl` CLI
+- `tests/`: Catch2-based C++ test suite
 
 ## 🖥️ Which interface to use
 

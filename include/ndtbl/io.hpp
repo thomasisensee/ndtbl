@@ -4,9 +4,15 @@
 #include "ndtbl/detail/mapped_payload.hpp"
 #include "ndtbl/runtime_field_group.hpp"
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
+#include <memory>
+#include <ostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ndtbl {

@@ -4,11 +4,14 @@
 #include "ndtbl/payload.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ndtbl {

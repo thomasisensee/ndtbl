@@ -4,9 +4,15 @@
 #include "ndtbl/detail/mapped_payload.hpp"
 #include "ndtbl/runtime_field_group.hpp"
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
+#include <memory>
+#include <ostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ndtbl {
@@ -177,8 +183,9 @@ read_group(const std::string& path)
       PayloadView<float>(payload_owner.get(), layout.value_count),
       payload_owner));
 #else
-    const std::vector<float> values =
-      detail::read_payload<float>(is, value_count);
+    // Keep this non-const so the payload buffer can be moved into the
+    // read-only FieldGroup storage instead of copied during load.
+    std::vector<float> values = detail::read_payload<float>(is, value_count);
     return RuntimeFieldGroup<Dim>(
       FieldGroup<float, Dim>(grid, metadata.field_names, std::move(values)));
 #endif
@@ -195,8 +202,9 @@ read_group(const std::string& path)
       PayloadView<double>(payload_owner.get(), layout.value_count),
       payload_owner));
 #else
-    const std::vector<double> values =
-      detail::read_payload<double>(is, value_count);
+    // Keep this non-const so the payload buffer can be moved into the
+    // read-only FieldGroup storage instead of copied during load.
+    std::vector<double> values = detail::read_payload<double>(is, value_count);
     return RuntimeFieldGroup<Dim>(
       FieldGroup<double, Dim>(grid, metadata.field_names, std::move(values)));
 #endif

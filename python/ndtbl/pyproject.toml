@@ -37,6 +37,7 @@ documentation = "https://ndtbl.readthedocs.io/"
 
 [project.optional-dependencies]
 docs = [
+    "breathe",
     "myst_parser",
     "sphinx",
     "sphinx_rtd_theme",

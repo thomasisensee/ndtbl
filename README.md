@@ -44,7 +44,7 @@ CLI for:
 - `ndtbl query`
 - `ndtbl generate`
 
-See [`python/ndtbl/README.md`](https://github.com/thomasisensee/ndtbl/tree/bump-actions/python/ndtbl) for Python package details.
+See [`python/ndtbl/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl) for Python package details.
 
 ## 📋 Prerequisites
 
@@ -124,7 +124,7 @@ selected `bounds_policy`.
 
 ## 🐍 Python Package
 
-The repository also ships a separate Python package in [`python/ndtbl/`](https://github.com/thomasisensee/ndtbl/tree/bump-actions/python/ndtbl).
+The repository also ships a separate Python package in [`python/ndtbl/`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl).
 
 That package installs a different CLI executable named `ndtbl`, with the
 subcommands:
@@ -146,7 +146,7 @@ After that, the Python CLI is available as:
 ndtbl --help
 ```
 
-See [`python/ndtbl/README.md`](https://github.com/thomasisensee/ndtbl/tree/bump-actions/python/ndtbl) for usage examples and Python API details.
+See [`python/ndtbl/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl) for usage examples and Python API details.
 
 ## 🧪 Testing
 
@@ -170,7 +170,7 @@ Lookup-time benchmarks are developer-only and are not part of CI by default.
 They use [Google Benchmark](https://github.com/google/benchmark) and measure
 query preparation, prepared evaluation, typed combined lookup, and
 runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See
-[`benchmarks/README.md`](https://github.com/thomasisensee/ndtbl/tree/bump-actions/benchmarks) for the benchmark case definitions and interpretation.
+[`benchmarks/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/benchmarks) for the benchmark case definitions and interpretation.
 
 Build the benchmark target:
 

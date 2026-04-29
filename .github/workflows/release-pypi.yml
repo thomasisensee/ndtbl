@@ -102,7 +102,7 @@ jobs:
       - name: Publish distributions to TestPyPI
         run: |
           uv publish --index testpypi \
-          --config-file ${{ github.workspace }}/python/ndtbl/pyproject.toml \
+          --project python/ndtbl \
           dist/*
 
   publish-pypi:
